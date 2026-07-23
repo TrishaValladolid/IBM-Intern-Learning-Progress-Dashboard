@@ -1,6 +1,7 @@
 com\dashboard\filter\CorsFilter.class
 com\dashboard\entity\AttendanceSession.class
 com\dashboard\resource\SubmissionResource.class
+com\dashboard\dto\RenameBatchRequest.class
 com\dashboard\dto\AttendanceSummary.class
 com\dashboard\dto\GradeCell.class
 com\dashboard\repository\TrainingRepository.class
@@ -44,7 +45,9 @@ com\dashboard\dto\LoginRequest.class
 com\dashboard\resource\InternResource.class
 com\dashboard\entity\Attendance$Status.class
 com\dashboard\resource\SubmissionResource$SubmissionRequest.class
+com\dashboard\dto\BatchSummary.class
 com\dashboard\config\StartupDataSeeder.class
 com\dashboard\dto\LoginResponse.class
+com\dashboard\resource\InternResource$Progress.class
 com\dashboard\repository\AttendanceRepository.class
 com\dashboard\repository\SubmissionRepository.class

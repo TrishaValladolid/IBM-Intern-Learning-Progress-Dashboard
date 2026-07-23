@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '../api/client'
 import auth from '../services/auth'
@@ -10,6 +10,13 @@ const progress = ref(null)
 const assignments = ref([])
 const scoreForm = ref({ assignmentId: '', score: '' })
 const error = ref('')
+const scoreError = ref('')
+
+// The assignment currently picked in the score form, so we can bound the score
+// input by its maxScore (can't grade 100 on a 50-point assignment).
+const selectedAssignment = computed(() =>
+  assignments.value.find((a) => a.id === scoreForm.value.assignmentId) || null,
+)
 
 const isAdmin = auth.isAdmin
 
@@ -34,15 +41,28 @@ async function loadAssignments() {
 }
 
 async function submitScore() {
+  scoreError.value = ''
   if (!scoreForm.value.assignmentId || scoreForm.value.score === '') return
-  await api.post('/submissions', {
-    internId: route.params.id,
-    assignmentId: scoreForm.value.assignmentId,
-    score: scoreForm.value.score,
-    status: 'GRADED',
-  })
-  scoreForm.value = { assignmentId: '', score: '' }
-  await loadProgress()
+
+  // Range guard: score must be within 0..maxScore for the chosen assignment.
+  const max = selectedAssignment.value?.maxScore
+  if (scoreForm.value.score < 0 || (max != null && scoreForm.value.score > max)) {
+    scoreError.value = `Score must be between 0 and ${max}.`
+    return
+  }
+
+  try {
+    await api.post('/submissions', {
+      internId: route.params.id,
+      assignmentId: scoreForm.value.assignmentId,
+      score: scoreForm.value.score,
+      status: 'GRADED',
+    })
+    scoreForm.value = { assignmentId: '', score: '' }
+    await loadProgress()
+  } catch (e) {
+    scoreError.value = e.response?.data || 'Could not save score.'
+  }
 }
 
 async function loadTrainings() {
@@ -184,13 +204,25 @@ onMounted(() => {
           </select>
         </div>
         <div class="field">
-          <label for="score-value">Score</label>
-          <input id="score-value" class="input" v-model.number="scoreForm.score" type="number" placeholder="Score" required />
+          <label for="score-value">
+            Score<span v-if="selectedAssignment" class="muted"> (0–{{ selectedAssignment.maxScore }})</span>
+          </label>
+          <input
+            id="score-value"
+            class="input"
+            v-model.number="scoreForm.score"
+            type="number"
+            min="0"
+            :max="selectedAssignment ? selectedAssignment.maxScore : undefined"
+            placeholder="Score"
+            required
+          />
         </div>
         <div class="field field--action">
           <button type="submit" class="btn btn--primary">Save Score</button>
         </div>
       </form>
+      <p v-if="scoreError" class="error score-error">{{ scoreError }}</p>
     </section>
 
     <!-- Edit training (ADMIN) -->
@@ -250,6 +282,9 @@ onMounted(() => {
 .section-hint {
   margin-top: calc(-1 * var(--sp-01));
   margin-bottom: var(--sp-03);
+}
+.score-error {
+  margin-top: var(--sp-02);
 }
 .repo-link {
   font-weight: 600;

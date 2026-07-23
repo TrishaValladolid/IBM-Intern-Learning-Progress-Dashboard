@@ -58,6 +58,17 @@ public class SubmissionResource {
             return Response.status(Response.Status.NOT_FOUND).entity("Assignment not found").build();
         }
 
+        // Range check: a score must fall within 0..maxScore for the assignment.
+        // Guards against recording e.g. 100 on a 50-point assignment.
+        if (req.score != null) {
+            Integer maxScore = assignment.getMaxScore();
+            if (req.score < 0 || (maxScore != null && req.score > maxScore)) {
+                return Response.status(Response.Status.BAD_REQUEST)
+                        .entity("Score must be between 0 and " + maxScore + ".")
+                        .build();
+            }
+        }
+
         Submission.Status status = req.status != null
                 ? Submission.Status.valueOf(req.status)
                 : Submission.Status.GRADED;
@@ -70,11 +81,15 @@ public class SubmissionResource {
         if (existing != null) {
             existing.setScore(req.score);
             existing.setStatus(status);
-            return Response.ok(submissionRepository.save(existing)).build();
+            Submission saved = submissionRepository.save(existing);
+            // Return a flat DTO, not the entity: serializing the lazy
+            // intern/assignment relations would trigger a JSON-B error.
+            return Response.ok(new GradeCell(req.internId, req.assignmentId, saved.getScore())).build();
         }
 
         Submission submission = new Submission(intern, assignment, req.score, status);
+        Submission saved = submissionRepository.save(submission);
         return Response.status(Response.Status.CREATED)
-                .entity(submissionRepository.save(submission)).build();
+                .entity(new GradeCell(intern.getId(), assignment.getId(), saved.getScore())).build();
     }
 }

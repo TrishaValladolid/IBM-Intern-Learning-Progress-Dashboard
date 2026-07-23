@@ -3,6 +3,7 @@ C:\Users\TrishaLaineValladoli\Downloads\progress-dashboard-wildfly\backend\src\m
 C:\Users\TrishaLaineValladoli\Downloads\progress-dashboard-wildfly\backend\src\main\java\com\dashboard\dto\AttendanceResponse.java
 C:\Users\TrishaLaineValladoli\Downloads\progress-dashboard-wildfly\backend\src\main\java\com\dashboard\dto\AttendanceRosterEntry.java
 C:\Users\TrishaLaineValladoli\Downloads\progress-dashboard-wildfly\backend\src\main\java\com\dashboard\dto\AttendanceSummary.java
+C:\Users\TrishaLaineValladoli\Downloads\progress-dashboard-wildfly\backend\src\main\java\com\dashboard\dto\BatchSummary.java
 C:\Users\TrishaLaineValladoli\Downloads\progress-dashboard-wildfly\backend\src\main\java\com\dashboard\dto\BatchTrainingRequest.java
 C:\Users\TrishaLaineValladoli\Downloads\progress-dashboard-wildfly\backend\src\main\java\com\dashboard\dto\CreateTrainerRequest.java
 C:\Users\TrishaLaineValladoli\Downloads\progress-dashboard-wildfly\backend\src\main\java\com\dashboard\dto\GradeCell.java
@@ -10,6 +11,7 @@ C:\Users\TrishaLaineValladoli\Downloads\progress-dashboard-wildfly\backend\src\m
 C:\Users\TrishaLaineValladoli\Downloads\progress-dashboard-wildfly\backend\src\main\java\com\dashboard\dto\LoginResponse.java
 C:\Users\TrishaLaineValladoli\Downloads\progress-dashboard-wildfly\backend\src\main\java\com\dashboard\dto\PasswordResetRequest.java
 C:\Users\TrishaLaineValladoli\Downloads\progress-dashboard-wildfly\backend\src\main\java\com\dashboard\dto\ProgressSummary.java
+C:\Users\TrishaLaineValladoli\Downloads\progress-dashboard-wildfly\backend\src\main\java\com\dashboard\dto\RenameBatchRequest.java
 C:\Users\TrishaLaineValladoli\Downloads\progress-dashboard-wildfly\backend\src\main\java\com\dashboard\dto\StatusRequest.java
 C:\Users\TrishaLaineValladoli\Downloads\progress-dashboard-wildfly\backend\src\main\java\com\dashboard\dto\TrainingRequest.java
 C:\Users\TrishaLaineValladoli\Downloads\progress-dashboard-wildfly\backend\src\main\java\com\dashboard\dto\UpdateTrainerRequest.java

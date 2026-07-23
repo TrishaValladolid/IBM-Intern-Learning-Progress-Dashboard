@@ -1,7 +1,9 @@
 package com.dashboard.resource;
 
+import com.dashboard.dto.BatchSummary;
 import com.dashboard.dto.BatchTrainingRequest;
 import com.dashboard.dto.ProgressSummary;
+import com.dashboard.dto.RenameBatchRequest;
 import com.dashboard.dto.TrainingRequest;
 import com.dashboard.entity.Assignment;
 import com.dashboard.entity.Intern;
@@ -18,9 +20,13 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Path("/interns")
 @Secured
@@ -97,16 +103,26 @@ public class InternResource {
             return Response.status(Response.Status.NOT_FOUND).entity("Intern not found").build();
         }
 
-        List<Assignment> allAssignments = assignmentRepository.findAll();
+        int total = assignmentRepository.findAll().size();
+        Progress p = computeProgress(internId, total);
+
+        ProgressSummary summary = new ProgressSummary(intern.getId(), intern.getName(), total,
+                p.completed, round2(p.completionPct), round2(p.avgScorePct));
+        return Response.ok(summary).build();
+    }
+
+    // Shared progress math for one intern: how many assignments are done and the
+    // average score, expressed as percentages. Used by both the per-intern
+    // /progress endpoint and the batch roll-up so there is one source of truth.
+    private Progress computeProgress(Long internId, int totalAssignments) {
         List<Submission> submissions = submissionRepository.findByInternId(internId);
 
-        int total = allAssignments.size();
         long completed = submissions.stream()
                 .filter(s -> s.getStatus() == Submission.Status.GRADED
                         || s.getStatus() == Submission.Status.SUBMITTED)
                 .count();
 
-        double completionPct = total == 0 ? 0.0 : (completed * 100.0 / total);
+        double completionPct = totalAssignments == 0 ? 0.0 : (completed * 100.0 / totalAssignments);
 
         double avgScorePct = submissions.stream()
                 .filter(s -> s.getScore() != null && s.getAssignment().getMaxScore() != null
@@ -115,9 +131,123 @@ public class InternResource {
                 .average()
                 .orElse(0.0);
 
-        ProgressSummary summary = new ProgressSummary(intern.getId(), intern.getName(), total,
-                (int) completed, round2(completionPct), round2(avgScorePct));
-        return Response.ok(summary).build();
+        return new Progress((int) completed, completionPct, avgScorePct);
+    }
+
+    // Simple carrier for the two progress figures plus the completed count.
+    private static class Progress {
+        final int completed;
+        final double completionPct;
+        final double avgScorePct;
+        Progress(int completed, double completionPct, double avgScorePct) {
+            this.completed = completed;
+            this.completionPct = completionPct;
+            this.avgScorePct = avgScorePct;
+        }
+    }
+
+    // ---- Training Batches (ADMIN) ----
+
+    // Roll-up of every training batch for the admin Training Batches overview.
+    // A batch is the Intern.batch String, so figures are aggregated from the
+    // interns in each cohort — no Batch entity exists or is needed.
+    @GET
+    @Path("/batches")
+    @RolesAllowed("ADMIN")
+    public List<BatchSummary> getBatchSummaries() {
+        List<Assignment> allAssignments = assignmentRepository.findAll();
+        int totalAssignments = allAssignments.size();
+
+        List<BatchSummary> summaries = new ArrayList<>();
+        for (String batch : internRepository.findDistinctBatches()) {
+            List<Intern> interns = internRepository.findByBatch(batch);
+
+            List<String> tracks = interns.stream()
+                    .map(Intern::getTrack)
+                    .filter(t -> t != null && !t.isBlank())
+                    .distinct()
+                    .sorted()
+                    .collect(Collectors.toList());
+
+            // Distinct training names across the batch's interns. Trainings are
+            // assigned per batch, so the distinct count is how many trainings
+            // this cohort has.
+            Set<String> trainingNames = new HashSet<>();
+            double sumCompletion = 0.0;
+            double sumScore = 0.0;
+            for (Intern intern : interns) {
+                trainingRepository.findByInternId(intern.getId()).forEach(t -> {
+                    if (t.getTrainingName() != null && !t.getTrainingName().isBlank()) {
+                        trainingNames.add(t.getTrainingName().trim().toLowerCase());
+                    }
+                });
+                Progress p = computeProgress(intern.getId(), totalAssignments);
+                sumCompletion += p.completionPct;
+                sumScore += p.avgScorePct;
+            }
+
+            long assignmentCount = allAssignments.stream()
+                    .filter(a -> batch.equals(a.getBatch()))
+                    .count();
+
+            int n = interns.size();
+            double avgCompletion = n == 0 ? 0.0 : sumCompletion / n;
+            double avgScore = n == 0 ? 0.0 : sumScore / n;
+
+            summaries.add(new BatchSummary(batch, n, tracks, trainingNames.size(),
+                    (int) assignmentCount, round2(avgCompletion), round2(avgScore)));
+        }
+        return summaries;
+    }
+
+    // Rename a batch: move every intern in the cohort to the new batch string,
+    // and keep any assignments that target that batch in sync. A batch is just a
+    // String, so this is a bulk value update — no schema change.
+    @PUT
+    @Path("/batches/rename")
+    @RolesAllowed("ADMIN")
+    public Response renameBatch(RenameBatchRequest req) {
+        if (req == null || req.oldBatch == null || req.oldBatch.isBlank()
+                || req.newBatch == null || req.newBatch.isBlank()) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity("{\"error\":\"Both oldBatch and newBatch are required.\"}").build();
+        }
+
+        String oldBatch = req.oldBatch.trim();
+        String newBatch = req.newBatch.trim();
+        if (oldBatch.equals(newBatch)) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity("{\"error\":\"New batch name must differ from the current one.\"}").build();
+        }
+
+        List<Intern> interns = internRepository.findByBatch(oldBatch);
+        if (interns.isEmpty()) {
+            return Response.status(Response.Status.NOT_FOUND)
+                    .entity("{\"error\":\"No interns found in batch \\\"" + oldBatch + "\\\".\"}").build();
+        }
+
+        for (Intern intern : interns) {
+            intern.setBatch(newBatch);
+            internRepository.save(intern);
+        }
+
+        // AssignmentRepository has no findByBatch, so scan and update the ones
+        // that point at the old batch to keep the cohort's assignments consistent.
+        int assignmentsUpdated = 0;
+        for (Assignment a : assignmentRepository.findAll()) {
+            if (oldBatch.equals(a.getBatch())) {
+                a.setBatch(newBatch);
+                assignmentRepository.save(a);
+                assignmentsUpdated++;
+            }
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("oldBatch", oldBatch);
+        result.put("newBatch", newBatch);
+        result.put("internsUpdated", interns.size());
+        result.put("assignmentsUpdated", assignmentsUpdated);
+        return Response.ok(result).build();
     }
 
     // ---- Training History ----
