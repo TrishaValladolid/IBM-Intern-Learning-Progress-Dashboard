@@ -1,5 +1,8 @@
 com\dashboard\filter\CorsFilter.class
+com\dashboard\entity\AttendanceSession.class
 com\dashboard\resource\SubmissionResource.class
+com\dashboard\dto\AttendanceRosterEntry.class
+com\dashboard\dto\AttendanceSummary.class
 com\dashboard\security\PasswordUtil.class
 com\dashboard\resource\TrainerResource.class
 com\dashboard\dto\UpdateTrainerRequest.class
@@ -9,6 +12,7 @@ com\dashboard\dto\PasswordResetRequest.class
 com\dashboard\entity\Submission.class
 com\dashboard\security\TokenService$Claims.class
 com\dashboard\entity\Intern.class
+com\dashboard\repository\AttendanceSessionRepository.class
 com\dashboard\dto\UserResponse.class
 com\dashboard\security\AuthenticationFilter$1.class
 com\dashboard\repository\AssignmentRepository.class
@@ -18,6 +22,7 @@ com\dashboard\security\AuthenticationFilter.class
 com\dashboard\dto\ProgressSummary.class
 com\dashboard\security\Secured.class
 com\dashboard\security\TokenService.class
+com\dashboard\resource\AttendanceResource.class
 com\dashboard\entity\Assignment.class
 com\dashboard\entity\Submission$Status.class
 com\dashboard\resource\AssignmentResource.class
@@ -26,9 +31,15 @@ com\dashboard\entity\User$Role.class
 com\dashboard\JaxRsActivator.class
 com\dashboard\dto\LoginRequest.class
 com\dashboard\resource\InternResource.class
+com\dashboard\entity\Attendance$Status.class
 com\dashboard\resource\SubmissionResource$SubmissionRequest.class
 com\dashboard\config\StartupDataSeeder.class
+com\dashboard\dto\AttendanceResponse.class
 com\dashboard\resource\AuthResource.class
+com\dashboard\dto\AttendanceBulkRequest$Entry.class
 com\dashboard\dto\LoginResponse.class
+com\dashboard\repository\AttendanceRepository.class
 com\dashboard\repository\SubmissionRepository.class
 com\dashboard\entity\User.class
+com\dashboard\entity\Attendance.class
+com\dashboard\dto\AttendanceBulkRequest.class

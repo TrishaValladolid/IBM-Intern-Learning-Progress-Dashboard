@@ -17,6 +17,22 @@ public class InternRepository {
         return em.createQuery("SELECT i FROM Intern i", Intern.class).getResultList();
     }
 
+    // All interns in a training (batch), ordered by name for the roster sheet.
+    public List<Intern> findByBatch(String batch) {
+        return em.createQuery(
+                "SELECT i FROM Intern i WHERE i.batch = :batch ORDER BY i.name", Intern.class)
+                .setParameter("batch", batch)
+                .getResultList();
+    }
+
+    // Distinct trainings (batches) to populate the "Select Training" dropdown.
+    public List<String> findDistinctBatches() {
+        return em.createQuery(
+                "SELECT DISTINCT i.batch FROM Intern i WHERE i.batch IS NOT NULL ORDER BY i.batch",
+                String.class)
+                .getResultList();
+    }
+
     public Intern findById(Long id) {
         return em.find(Intern.class, id);
     }

@@ -28,6 +28,7 @@ const adminItems = [
   { label: 'Trainers', to: '/trainers', icon: 'trainers' },
   { label: 'Training Batches', to: '/batches', icon: 'batches' },
   { label: 'Assignments', to: '/assignments', icon: 'assignments' },
+  { label: 'Attendance', to: '/attendance', icon: 'attendance' },
   { label: 'Reports', to: '/reports', icon: 'reports' },
 ]
 

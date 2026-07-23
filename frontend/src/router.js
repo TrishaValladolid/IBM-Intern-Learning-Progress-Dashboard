@@ -34,7 +34,7 @@ const routes = [
 
   // Trainer-only module pages.
   { path: '/my-batches', component: MyBatchesView, meta: { roles: ['TRAINER'] } },
-  { path: '/attendance', component: AttendanceView, meta: { roles: ['TRAINER'] } },
+  { path: '/attendance', component: AttendanceView, meta: { roles: ['ADMIN', 'TRAINER'] } },
   { path: '/progress-tracking', component: ProgressTrackingView, meta: { roles: ['TRAINER'] } },
 
   // Root: send users to the right place based on auth/role.
