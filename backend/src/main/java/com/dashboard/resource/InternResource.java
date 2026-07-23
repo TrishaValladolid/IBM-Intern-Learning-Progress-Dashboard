@@ -7,6 +7,8 @@ import com.dashboard.entity.Submission;
 import com.dashboard.repository.AssignmentRepository;
 import com.dashboard.repository.InternRepository;
 import com.dashboard.repository.SubmissionRepository;
+import com.dashboard.security.Secured;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -15,6 +17,7 @@ import jakarta.ws.rs.core.Response;
 import java.util.List;
 
 @Path("/interns")
+@Secured
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class InternResource {
@@ -42,6 +45,7 @@ public class InternResource {
     }
 
     @POST
+    @RolesAllowed("ADMIN")
     public Response create(Intern intern) {
         Intern saved = internRepository.save(intern);
         return Response.status(Response.Status.CREATED).entity(saved).build();
@@ -49,6 +53,7 @@ public class InternResource {
 
     @PUT
     @Path("/{id}")
+    @RolesAllowed("ADMIN")
     public Response update(@PathParam("id") Long id, Intern updated) {
         Intern existing = internRepository.findById(id);
         if (existing == null) {
@@ -63,6 +68,7 @@ public class InternResource {
 
     @DELETE
     @Path("/{id}")
+    @RolesAllowed("ADMIN")
     public Response delete(@PathParam("id") Long id) {
         internRepository.deleteById(id);
         return Response.noContent().build();

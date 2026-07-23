@@ -6,12 +6,14 @@ import com.dashboard.entity.Submission;
 import com.dashboard.repository.AssignmentRepository;
 import com.dashboard.repository.InternRepository;
 import com.dashboard.repository.SubmissionRepository;
+import com.dashboard.security.Secured;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
 @Path("/submissions")
+@Secured
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class SubmissionResource {

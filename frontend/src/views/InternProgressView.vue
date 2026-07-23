@@ -43,34 +43,101 @@ onMounted(() => {
 
 <template>
   <div class="page">
-    <h1>Intern Progress</h1>
-    <p v-if="error" class="error">{{ error }}</p>
-
-    <div v-if="progress" class="summary">
-      <h2>{{ progress.internName }}</h2>
-      <p>Assignments completed: {{ progress.completedAssignments }} / {{ progress.totalAssignments }}</p>
-      <div class="bar"><div class="bar-fill" :style="{ width: progress.completionPercentage + '%' }"></div></div>
-      <p>Completion: {{ progress.completionPercentage }}%</p>
-      <p>Average score: {{ progress.averageScorePercentage }}%</p>
+    <div class="page-header">
+      <router-link to="/interns" class="back-link">← Interns</router-link>
+      <h1>Intern Progress</h1>
+      <p v-if="progress" class="subtitle">{{ progress.internName }}</p>
     </div>
 
-    <h3>Record a score</h3>
-    <form class="add-form" @submit.prevent="submitScore">
-      <select v-model="scoreForm.assignmentId" required>
-        <option value="" disabled>Select assignment</option>
-        <option v-for="a in assignments" :key="a.id" :value="a.id">{{ a.title }} (max {{ a.maxScore }})</option>
-      </select>
-      <input v-model.number="scoreForm.score" type="number" placeholder="Score" required />
-      <button type="submit">Save Score</button>
-    </form>
+    <p v-if="error" class="error section">{{ error }}</p>
+
+    <template v-if="progress">
+      <!-- KPI stat tiles -->
+      <section class="stat-grid section">
+        <div class="stat-tile">
+          <span class="stat-label">Assignments completed</span>
+          <span class="stat-value">{{ progress.completedAssignments }} / {{ progress.totalAssignments }}</span>
+        </div>
+        <div class="stat-tile">
+          <span class="stat-label">Completion</span>
+          <span class="stat-value">{{ progress.completionPercentage }}%</span>
+        </div>
+        <div class="stat-tile">
+          <span class="stat-label">Average score</span>
+          <span class="stat-value">{{ progress.averageScorePercentage }}%</span>
+        </div>
+      </section>
+
+      <!-- Completion meter -->
+      <section class="card section">
+        <div class="meter-header">
+          <span class="stat-label">Overall completion</span>
+          <span class="meter-pct">{{ progress.completionPercentage }}%</span>
+        </div>
+        <div class="meter">
+          <div class="meter-fill" :style="{ width: progress.completionPercentage + '%' }"></div>
+        </div>
+      </section>
+    </template>
+
+    <!-- Record a score -->
+    <section class="card section">
+      <h3 class="form-title">Record a score</h3>
+      <form class="add-form" @submit.prevent="submitScore">
+        <div class="field">
+          <label for="score-assignment">Assignment</label>
+          <select id="score-assignment" class="select" v-model="scoreForm.assignmentId" required>
+            <option value="" disabled>Select assignment</option>
+            <option v-for="a in assignments" :key="a.id" :value="a.id">{{ a.title }} (max {{ a.maxScore }})</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="score-value">Score</label>
+          <input id="score-value" class="input" v-model.number="scoreForm.score" type="number" placeholder="Score" required />
+        </div>
+        <div class="field field--action">
+          <button type="submit" class="btn btn--primary">Save Score</button>
+        </div>
+      </form>
+    </section>
   </div>
 </template>
 
 <style scoped>
-.page { max-width: 700px; margin: 0 auto; padding: 2rem; text-align: left; }
-.summary { border: 1px solid #ddd; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; }
-.bar { background: #eee; border-radius: 6px; height: 10px; overflow: hidden; margin: 0.5rem 0; }
-.bar-fill { background: #42b883; height: 100%; }
-.add-form { display: flex; gap: 0.5rem; }
-.error { color: #c0392b; }
+.back-link {
+  display: inline-block;
+  font-size: 14px;
+  margin-bottom: var(--sp-02);
+}
+.back-link:hover {
+  text-decoration: none;
+}
+.form-title {
+  margin-bottom: var(--sp-02);
+}
+.meter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: var(--sp-01);
+}
+.meter-pct {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.add-form {
+  display: flex;
+  gap: var(--sp-02);
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.add-form .field {
+  flex: 1 1 220px;
+  min-width: 180px;
+}
+.add-form .field--action {
+  flex: 0 0 auto;
+  min-width: 0;
+}
 </style>

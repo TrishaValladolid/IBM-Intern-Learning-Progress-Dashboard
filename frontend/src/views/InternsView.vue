@@ -1,6 +1,9 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import api from '../api/client'
+import auth from '../services/auth'
+
+const isAdmin = auth.isAdmin
 
 const interns = ref([])
 const form = ref({ name: '', employeeId: '', batch: '', track: '' })
@@ -40,42 +43,85 @@ onMounted(loadInterns)
 
 <template>
   <div class="page">
-    <h1>Interns</h1>
-    <p v-if="error" class="error">{{ error }}</p>
+    <div class="page-header">
+      <h1>Interns</h1>
+      <p class="subtitle">Manage intern records and open individual progress trackers.</p>
+    </div>
 
-    <form class="add-form" @submit.prevent="addIntern">
-      <input v-model="form.name" placeholder="Name" required />
-      <input v-model="form.employeeId" placeholder="Employee ID" />
-      <input v-model="form.batch" placeholder="Batch" />
-      <input v-model="form.track" placeholder="Track" />
-      <button type="submit">Add Intern</button>
-    </form>
+    <p v-if="error" class="error section">{{ error }}</p>
 
-    <p v-if="loading">Loading...</p>
-    <table v-else class="data-table">
-      <thead>
-        <tr><th>Name</th><th>Employee ID</th><th>Batch</th><th>Track</th><th></th></tr>
-      </thead>
-      <tbody>
-        <tr v-for="i in interns" :key="i.id">
-          <td>
-            <router-link :to="`/interns/${i.id}/progress`">{{ i.name }}</router-link>
-          </td>
-          <td>{{ i.employeeId }}</td>
-          <td>{{ i.batch }}</td>
-          <td>{{ i.track }}</td>
-          <td><button @click="removeIntern(i.id)">Delete</button></td>
-        </tr>
-      </tbody>
-    </table>
+    <section v-if="isAdmin" class="card section">
+      <h3 class="form-title">Add intern</h3>
+      <form class="add-form" @submit.prevent="addIntern">
+        <div class="field">
+          <label for="intern-name">Name</label>
+          <input id="intern-name" class="input" v-model="form.name" placeholder="Full name" required />
+        </div>
+        <div class="field">
+          <label for="intern-emp">Employee ID</label>
+          <input id="intern-emp" class="input" v-model="form.employeeId" placeholder="e.g. IBM-0042" />
+        </div>
+        <div class="field">
+          <label for="intern-batch">Batch</label>
+          <input id="intern-batch" class="input" v-model="form.batch" placeholder="e.g. 2026-Q1" />
+        </div>
+        <div class="field">
+          <label for="intern-track">Track</label>
+          <input id="intern-track" class="input" v-model="form.track" placeholder="e.g. Backend" />
+        </div>
+        <div class="field field--action">
+          <button type="submit" class="btn btn--primary">Add Intern</button>
+        </div>
+      </form>
+    </section>
+
+    <p v-if="loading" class="muted">Loading…</p>
+    <div v-else class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Name</th><th>Employee ID</th><th>Batch</th><th>Track</th><th v-if="isAdmin" class="col-action"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="i in interns" :key="i.id">
+            <td>
+              <router-link :to="`/interns/${i.id}/progress`">{{ i.name }}</router-link>
+            </td>
+            <td>{{ i.employeeId }}</td>
+            <td>{{ i.batch }}</td>
+            <td>{{ i.track }}</td>
+            <td v-if="isAdmin" class="col-action">
+              <button class="btn btn--danger" @click="removeIntern(i.id)">Delete</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.page { max-width: 900px; margin: 0 auto; padding: 2rem; text-align: left; }
-.add-form { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
-.add-form input { padding: 0.4rem; }
-.data-table { width: 100%; border-collapse: collapse; }
-.data-table th, .data-table td { border: 1px solid #ddd; padding: 0.5rem; text-align: left; }
-.error { color: #c0392b; }
+.form-title {
+  margin-bottom: var(--sp-02);
+}
+.add-form {
+  display: flex;
+  gap: var(--sp-02);
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.add-form .field {
+  flex: 1 1 180px;
+  min-width: 160px;
+}
+.add-form .field--action {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.col-action {
+  text-align: right;
+  width: 1%;
+  white-space: nowrap;
+}
 </style>

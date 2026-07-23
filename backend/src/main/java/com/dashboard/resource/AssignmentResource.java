@@ -2,6 +2,7 @@ package com.dashboard.resource;
 
 import com.dashboard.entity.Assignment;
 import com.dashboard.repository.AssignmentRepository;
+import com.dashboard.security.Secured;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -10,6 +11,7 @@ import jakarta.ws.rs.core.Response;
 import java.util.List;
 
 @Path("/assignments")
+@Secured
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class AssignmentResource {
