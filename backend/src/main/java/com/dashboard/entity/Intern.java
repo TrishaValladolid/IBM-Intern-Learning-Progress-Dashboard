@@ -14,8 +14,8 @@ public class Intern {
     @NotBlank
     private String name;
 
-    @Column(name = "employee_id")
-    private String employeeId;
+    @Column(name = "talent_id")
+    private String talentId;
 
     private String batch;
 
@@ -23,9 +23,9 @@ public class Intern {
 
     public Intern() {}
 
-    public Intern(String name, String employeeId, String batch, String track) {
+    public Intern(String name, String talentId, String batch, String track) {
         this.name = name;
-        this.employeeId = employeeId;
+        this.talentId = talentId;
         this.batch = batch;
         this.track = track;
     }
@@ -36,8 +36,8 @@ public class Intern {
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
 
-    public String getEmployeeId() { return employeeId; }
-    public void setEmployeeId(String employeeId) { this.employeeId = employeeId; }
+    public String getTalentId() { return talentId; }
+    public void setTalentId(String talentId) { this.talentId = talentId; }
 
     public String getBatch() { return batch; }
     public void setBatch(String batch) { this.batch = batch; }

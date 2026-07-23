@@ -60,7 +60,7 @@ public class InternResource {
             return Response.status(Response.Status.NOT_FOUND).build();
         }
         existing.setName(updated.getName());
-        existing.setEmployeeId(updated.getEmployeeId());
+        existing.setTalentId(updated.getTalentId());
         existing.setBatch(updated.getBatch());
         existing.setTrack(updated.getTrack());
         return Response.ok(internRepository.save(existing)).build();

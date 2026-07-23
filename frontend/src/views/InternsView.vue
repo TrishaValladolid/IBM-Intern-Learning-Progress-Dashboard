@@ -6,7 +6,7 @@ import auth from '../services/auth'
 const isAdmin = auth.isAdmin
 
 const interns = ref([])
-const form = ref({ name: '', employeeId: '', batch: '', track: '' })
+const form = ref({ name: '', talentId: '', batch: '', track: '' })
 const loading = ref(false)
 const error = ref('')
 
@@ -26,7 +26,7 @@ async function addIntern() {
   if (!form.value.name) return
   try {
     await api.post('/interns', form.value)
-    form.value = { name: '', employeeId: '', batch: '', track: '' }
+    form.value = { name: '', talentId: '', batch: '', track: '' }
     await loadInterns()
   } catch (e) {
     error.value = 'Could not add intern.'
@@ -58,8 +58,8 @@ onMounted(loadInterns)
           <input id="intern-name" class="input" v-model="form.name" placeholder="Full name" required />
         </div>
         <div class="field">
-          <label for="intern-emp">Employee ID</label>
-          <input id="intern-emp" class="input" v-model="form.employeeId" placeholder="e.g. IBM-0042" />
+          <label for="intern-emp">Talent ID</label>
+          <input id="intern-emp" class="input" v-model="form.talentId" placeholder="e.g. AVY9VKPH1" />
         </div>
         <div class="field">
           <label for="intern-batch">Batch</label>
@@ -80,7 +80,7 @@ onMounted(loadInterns)
       <table class="data-table">
         <thead>
           <tr>
-            <th>Name</th><th>Employee ID</th><th>Batch</th><th>Track</th><th v-if="isAdmin" class="col-action"></th>
+            <th>Name</th><th>Talent ID</th><th>Batch</th><th>Track</th><th v-if="isAdmin" class="col-action"></th>
           </tr>
         </thead>
         <tbody>
@@ -88,7 +88,7 @@ onMounted(loadInterns)
             <td>
               <router-link :to="`/interns/${i.id}/progress`">{{ i.name }}</router-link>
             </td>
-            <td>{{ i.employeeId }}</td>
+            <td>{{ i.talentId }}</td>
             <td>{{ i.batch }}</td>
             <td>{{ i.track }}</td>
             <td v-if="isAdmin" class="col-action">

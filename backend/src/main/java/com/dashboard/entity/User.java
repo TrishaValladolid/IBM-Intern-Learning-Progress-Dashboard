@@ -2,6 +2,8 @@ package com.dashboard.entity;
 
 import jakarta.persistence.*;
 
+import java.time.LocalDateTime;
+
 /**
  * Application user account. Only two roles exist in this system:
  * ADMIN (Program/Training Coordinator) and TRAINER.
@@ -28,6 +30,16 @@ public class User {
     @Column(name = "full_name")
     private String fullName;
 
+    @Column(name = "email")
+    private String email;
+
+    /** Whether the account may log in. Disabled accounts are rejected at authentication. */
+    @Column(name = "enabled", nullable = false, columnDefinition = "boolean default true")
+    private boolean enabled = true;
+
+    @Column(name = "created_date")
+    private LocalDateTime createdDate;
+
     public User() {}
 
     public User(String username, String passwordHash, Role role, String fullName) {
@@ -35,6 +47,13 @@ public class User {
         this.passwordHash = passwordHash;
         this.role = role;
         this.fullName = fullName;
+    }
+
+    @PrePersist
+    void onCreate() {
+        if (createdDate == null) {
+            createdDate = LocalDateTime.now();
+        }
     }
 
     public Long getId() { return id; }
@@ -51,6 +70,15 @@ public class User {
 
     public String getFullName() { return fullName; }
     public void setFullName(String fullName) { this.fullName = fullName; }
+
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+
+    public boolean isEnabled() { return enabled; }
+    public void setEnabled(boolean enabled) { this.enabled = enabled; }
+
+    public LocalDateTime getCreatedDate() { return createdDate; }
+    public void setCreatedDate(LocalDateTime createdDate) { this.createdDate = createdDate; }
 
     public enum Role {
         ADMIN,

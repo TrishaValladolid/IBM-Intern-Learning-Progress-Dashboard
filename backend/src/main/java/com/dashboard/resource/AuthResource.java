@@ -45,6 +45,13 @@ public class AuthResource {
                     .build();
         }
 
+        // Disabled accounts have valid credentials but must not be allowed to log in.
+        if (!user.isEnabled()) {
+            return Response.status(Response.Status.FORBIDDEN)
+                    .entity("{\"error\":\"Your account has been disabled. Contact your administrator.\"}")
+                    .build();
+        }
+
         String token = TokenService.issue(user);
         LoginResponse body = new LoginResponse(
                 token, user.getUsername(), user.getRole().name(), user.getFullName());
