@@ -1,0 +1,14 @@
+com\dashboard\dto\ProgressSummary.class
+com\dashboard\filter\CorsFilter.class
+com\dashboard\entity\Assignment.class
+com\dashboard\entity\Submission$Status.class
+com\dashboard\resource\AssignmentResource.class
+com\dashboard\resource\SubmissionResource.class
+com\dashboard\JaxRsActivator.class
+com\dashboard\resource\InternResource.class
+com\dashboard\resource\SubmissionResource$SubmissionRequest.class
+com\dashboard\entity\Submission.class
+com\dashboard\entity\Intern.class
+com\dashboard\repository\SubmissionRepository.class
+com\dashboard\repository\AssignmentRepository.class
+com\dashboard\repository\InternRepository.class

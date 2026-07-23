@@ -1,0 +1,12 @@
+C:\Users\TrishaLaineValladoli\Downloads\progress-dashboard-wildfly\backend\src\main\java\com\dashboard\dto\ProgressSummary.java
+C:\Users\TrishaLaineValladoli\Downloads\progress-dashboard-wildfly\backend\src\main\java\com\dashboard\entity\Assignment.java
+C:\Users\TrishaLaineValladoli\Downloads\progress-dashboard-wildfly\backend\src\main\java\com\dashboard\entity\Intern.java
+C:\Users\TrishaLaineValladoli\Downloads\progress-dashboard-wildfly\backend\src\main\java\com\dashboard\entity\Submission.java
+C:\Users\TrishaLaineValladoli\Downloads\progress-dashboard-wildfly\backend\src\main\java\com\dashboard\filter\CorsFilter.java
+C:\Users\TrishaLaineValladoli\Downloads\progress-dashboard-wildfly\backend\src\main\java\com\dashboard\JaxRsActivator.java
+C:\Users\TrishaLaineValladoli\Downloads\progress-dashboard-wildfly\backend\src\main\java\com\dashboard\repository\AssignmentRepository.java
+C:\Users\TrishaLaineValladoli\Downloads\progress-dashboard-wildfly\backend\src\main\java\com\dashboard\repository\InternRepository.java
+C:\Users\TrishaLaineValladoli\Downloads\progress-dashboard-wildfly\backend\src\main\java\com\dashboard\repository\SubmissionRepository.java
+C:\Users\TrishaLaineValladoli\Downloads\progress-dashboard-wildfly\backend\src\main\java\com\dashboard\resource\AssignmentResource.java
+C:\Users\TrishaLaineValladoli\Downloads\progress-dashboard-wildfly\backend\src\main\java\com\dashboard\resource\InternResource.java
+C:\Users\TrishaLaineValladoli\Downloads\progress-dashboard-wildfly\backend\src\main\java\com\dashboard\resource\SubmissionResource.java
