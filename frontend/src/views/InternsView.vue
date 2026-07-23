@@ -1,7 +1,8 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import api from '../api/client'
 import auth from '../services/auth'
+import Modal from '../components/Modal.vue'
 
 const isAdmin = auth.isAdmin
 
@@ -9,6 +10,20 @@ const interns = ref([])
 const form = ref({ name: '', talentId: '', batch: '', track: '' })
 const loading = ref(false)
 const error = ref('')
+
+// ---- Assign training to a batch ----
+const batchDialog = ref(false)
+const batchForm = ref({ trainingName: '', repoUrl: '', batch: '' })
+const batchError = ref('')
+const batchResult = ref('')
+
+// Distinct, non-empty batches taken from the loaded interns.
+const batches = computed(() => {
+  const set = new Set(
+    interns.value.map((i) => i.batch).filter((b) => b && b.trim())
+  )
+  return [...set].sort()
+})
 
 async function loadInterns() {
   loading.value = true
@@ -19,6 +34,34 @@ async function loadInterns() {
     error.value = 'Could not load interns. Is the backend running?'
   } finally {
     loading.value = false
+  }
+}
+
+function openBatchDialog() {
+  batchForm.value = { trainingName: '', repoUrl: '', batch: '' }
+  batchError.value = ''
+  batchResult.value = ''
+  batchDialog.value = true
+}
+
+async function assignBatch() {
+  if (!batchForm.value.trainingName.trim() || !batchForm.value.batch) {
+    batchError.value = 'Training name and batch are required.'
+    return
+  }
+  batchError.value = ''
+  try {
+    const res = await api.post('/interns/trainings/batch', {
+      trainingName: batchForm.value.trainingName.trim(),
+      repoUrl: batchForm.value.repoUrl.trim(),
+      batch: batchForm.value.batch,
+    })
+    const r = res.data
+    batchResult.value =
+      `"${r.trainingName}" assigned to ${r.assigned} of ${r.total} intern(s) in batch ${r.batch}` +
+      (r.skipped ? ` (${r.skipped} already had it).` : '.')
+  } catch (e) {
+    batchError.value = 'Could not assign training to batch.'
   }
 }
 
@@ -44,8 +87,15 @@ onMounted(loadInterns)
 <template>
   <div class="page">
     <div class="page-header">
-      <h1>Interns</h1>
-      <p class="subtitle">Manage intern records and open individual progress trackers.</p>
+      <div class="header-row">
+        <div>
+          <h1>Interns</h1>
+          <p class="subtitle">Manage intern records and open individual progress trackers.</p>
+        </div>
+        <button v-if="isAdmin" class="btn btn--primary" @click="openBatchDialog">
+          Assign Training to Batch
+        </button>
+      </div>
     </div>
 
     <p v-if="error" class="error section">{{ error }}</p>
@@ -98,6 +148,49 @@ onMounted(loadInterns)
         </tbody>
       </table>
     </div>
+
+    <!-- Assign training to a batch (ADMIN) -->
+    <Modal :open="batchDialog" title="Assign training to batch" @close="batchDialog = false">
+      <p class="muted modal-hint">
+        Create a training once and assign it to every intern in a batch. Interns who
+        already have this training are skipped.
+      </p>
+      <p v-if="batchError" class="error">{{ batchError }}</p>
+      <p v-if="batchResult" class="batch-result">{{ batchResult }}</p>
+
+      <div class="field">
+        <label for="batch-training-name">Training name</label>
+        <input
+          id="batch-training-name"
+          class="input"
+          v-model="batchForm.trainingName"
+          placeholder="e.g. Java, Ionic, Japanese Language"
+          required
+        />
+      </div>
+      <div class="field">
+        <label for="batch-select">Batch</label>
+        <select id="batch-select" class="select" v-model="batchForm.batch" required>
+          <option value="" disabled>Select a batch</option>
+          <option v-for="b in batches" :key="b" :value="b">{{ b }}</option>
+        </select>
+        <p v-if="batches.length === 0" class="muted">No batches found. Add interns with a batch first.</p>
+      </div>
+      <div class="field">
+        <label for="batch-box">Box Drive link (optional)</label>
+        <input
+          id="batch-box"
+          class="input"
+          v-model="batchForm.repoUrl"
+          placeholder="https://app.box.com/… (shared upload folder)"
+        />
+      </div>
+
+      <template #footer>
+        <button class="btn btn--secondary" @click="batchDialog = false">Close</button>
+        <button class="btn btn--primary" @click="assignBatch">Assign</button>
+      </template>
+    </Modal>
   </div>
 </template>
 
@@ -123,5 +216,20 @@ onMounted(loadInterns)
   text-align: right;
   width: 1%;
   white-space: nowrap;
+}
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--sp-03);
+  flex-wrap: wrap;
+}
+.modal-hint {
+  margin-bottom: var(--sp-03);
+}
+.batch-result {
+  color: var(--support-success, #24a148);
+  font-weight: 600;
+  margin-bottom: var(--sp-02);
 }
 </style>

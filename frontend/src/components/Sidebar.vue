@@ -27,15 +27,16 @@ const adminItems = [
   { label: 'Interns', to: '/interns', icon: 'interns' },
   { label: 'Trainers', to: '/trainers', icon: 'trainers' },
   { label: 'Training Batches', to: '/batches', icon: 'batches' },
-  { label: 'Assignments', to: '/assignments', icon: 'assignments' },
+  { label: 'Assignments and Grades', to: '/assignments', icon: 'assignments' },
   { label: 'Attendance', to: '/attendance', icon: 'attendance' },
   { label: 'Reports', to: '/reports', icon: 'reports' },
 ]
 
 const trainerItems = [
   { label: 'Dashboard', to: '/trainer', icon: 'dashboard' },
+  { label: 'Interns', to: '/interns', icon: 'interns' },
   { label: 'My Batches', to: '/my-batches', icon: 'batches' },
-  { label: 'Assignments', to: '/assignments', icon: 'assignments' },
+  { label: 'Assignments and Grades', to: '/assignments', icon: 'assignments' },
   { label: 'Attendance', to: '/attendance', icon: 'attendance' },
   { label: 'Progress Tracking', to: '/progress-tracking', icon: 'progress' },
   { label: 'Reports', to: '/reports', icon: 'reports' },
