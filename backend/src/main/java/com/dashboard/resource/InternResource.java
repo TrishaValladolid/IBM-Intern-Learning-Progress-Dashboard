@@ -1,7 +1,10 @@
 package com.dashboard.resource;
 
+import com.dashboard.dto.BatchArchiveRequest;
 import com.dashboard.dto.BatchSummary;
 import com.dashboard.dto.BatchTrainingRequest;
+import com.dashboard.dto.GradeSummary;
+import com.dashboard.dto.InternStatusRequest;
 import com.dashboard.dto.ProgressSummary;
 import com.dashboard.dto.RenameBatchRequest;
 import com.dashboard.dto.TrainingRequest;
@@ -17,8 +20,10 @@ import com.dashboard.security.Secured;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.SecurityContext;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -42,17 +47,34 @@ public class InternResource {
     private SubmissionRepository submissionRepository;
     @Inject
     private TrainingRepository trainingRepository;
+    @Context
+    private SecurityContext securityContext;
+
+    // Admins see every intern; trainers only ACTIVE ones (legacy NULL counts as
+    // active). Enforced here, not just in the UI, so a trainer cannot reach an
+    // archived record by calling the API directly.
+    private boolean isAdmin() {
+        return securityContext.isUserInRole("ADMIN");
+    }
+
+    // True when the caller is allowed to see this intern: admins always, trainers
+    // only while the intern is ACTIVE. Used to hide archived records from trainers.
+    private boolean canView(Intern intern) {
+        return isAdmin() || intern.getStatus() == Intern.Status.ACTIVE;
+    }
 
     @GET
     public List<Intern> getAll() {
-        return internRepository.findAll();
+        return isAdmin() ? internRepository.findAll() : internRepository.findAllActive();
     }
 
     @GET
     @Path("/{id}")
     public Response getOne(@PathParam("id") Long id) {
         Intern intern = internRepository.findById(id);
-        if (intern == null) {
+        // Trainers get 404 (not 403) for archived interns so the endpoint does
+        // not reveal that an archived record exists.
+        if (intern == null || !canView(intern)) {
             return Response.status(Response.Status.NOT_FOUND).build();
         }
         return Response.ok(intern).build();
@@ -61,6 +83,12 @@ public class InternResource {
     @POST
     @RolesAllowed("ADMIN")
     public Response create(Intern intern) {
+        // Normalise the profile detail fields the same way an edit does.
+        intern.setTotalHoursRequired(sanitizeHours(intern.getTotalHoursRequired()));
+        intern.setExpectedGraduationDate(blankToNull(intern.getExpectedGraduationDate()));
+        intern.setExpectedInternshipEndDate(blankToNull(intern.getExpectedInternshipEndDate()));
+        intern.setSchool(blankToNull(intern.getSchool()));
+        intern.setCourse(blankToNull(intern.getCourse()));
         Intern saved = internRepository.save(intern);
         return Response.status(Response.Status.CREATED).entity(saved).build();
     }
@@ -77,6 +105,40 @@ public class InternResource {
         existing.setTalentId(updated.getTalentId());
         existing.setBatch(updated.getBatch());
         existing.setTrack(updated.getTrack());
+        // Profile detail fields are set directly, including null when a form clears them.
+        existing.setTotalHoursRequired(sanitizeHours(updated.getTotalHoursRequired()));
+        existing.setExpectedGraduationDate(blankToNull(updated.getExpectedGraduationDate()));
+        existing.setExpectedInternshipEndDate(blankToNull(updated.getExpectedInternshipEndDate()));
+        existing.setSchool(blankToNull(updated.getSchool()));
+        existing.setCourse(blankToNull(updated.getCourse()));
+        // Apply status when the edit form supplies one; leave it untouched
+        // otherwise so a status-less update does not silently reactivate.
+        if (updated.getStatus() != null) {
+            existing.setStatus(updated.getStatus());
+        }
+        return Response.ok(internRepository.save(existing)).build();
+    }
+
+    // Change one intern's lifecycle status (ADMIN). Unlike batch archive this may
+    // set ACTIVE, so an admin can reactivate an intern that was archived by mistake.
+    @PUT
+    @Path("/{id}/status")
+    @RolesAllowed("ADMIN")
+    public Response updateStatus(@PathParam("id") Long id, InternStatusRequest req) {
+        if (req == null || req.status == null || req.status.isBlank()) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity("{\"error\":\"Status is required.\"}").build();
+        }
+        Intern.Status status = parseStatus(req.status);
+        if (status == null) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity("{\"error\":\"Invalid status \\\"" + req.status + "\\\".\"}").build();
+        }
+        Intern existing = internRepository.findById(id);
+        if (existing == null) {
+            return Response.status(Response.Status.NOT_FOUND).build();
+        }
+        existing.setStatus(status);
         return Response.ok(internRepository.save(existing)).build();
     }
 
@@ -90,8 +152,14 @@ public class InternResource {
 
     @GET
     @Path("/{id}/submissions")
-    public List<Submission> getSubmissionsForIntern(@PathParam("id") Long internId) {
-        return submissionRepository.findByInternId(internId);
+    public Response getSubmissionsForIntern(@PathParam("id") Long internId) {
+        Intern intern = internRepository.findById(internId);
+        // Trainers must not read an archived intern's submissions via a direct
+        // URL; 404 hides the record's existence.
+        if (intern == null || !canView(intern)) {
+            return Response.status(Response.Status.NOT_FOUND).build();
+        }
+        return Response.ok(submissionRepository.findByInternId(internId)).build();
     }
 
     // Main feature: overall learning progress for one intern
@@ -99,7 +167,7 @@ public class InternResource {
     @Path("/{id}/progress")
     public Response getProgress(@PathParam("id") Long internId) {
         Intern intern = internRepository.findById(internId);
-        if (intern == null) {
+        if (intern == null || !canView(intern)) {
             return Response.status(Response.Status.NOT_FOUND).entity("Intern not found").build();
         }
 
@@ -109,6 +177,79 @@ public class InternResource {
         ProgressSummary summary = new ProgressSummary(intern.getId(), intern.getName(), total,
                 p.completed, round2(p.completionPct), round2(p.avgScorePct));
         return Response.ok(summary).build();
+    }
+
+    // Grade roll-up for one intern, grouped by training/category, computed on the
+    // backend so the frontend does not replicate the total math. Ungraded
+    // submissions never count as zero — they contribute to neither total. An
+    // assignment with no training is returned in independentAssignments.
+    @GET
+    @Path("/{id}/grades")
+    public Response getGrades(@PathParam("id") Long internId) {
+        Intern intern = internRepository.findById(internId);
+        if (intern == null || !canView(intern)) {
+            return Response.status(Response.Status.NOT_FOUND).entity("Intern not found").build();
+        }
+        return Response.ok(buildGradeSummary(internId)).build();
+    }
+
+    // Assemble the GradeSummary from the intern's submissions. Each graded
+    // submission maps to one assignment; assignments are bucketed by their
+    // trainingName. A blank/absent training name lands in independentAssignments.
+    private GradeSummary buildGradeSummary(Long internId) {
+        GradeSummary summary = new GradeSummary(internId);
+
+        // Preserve first-seen ordering of categories for a stable UI.
+        Map<String, GradeSummary.Category> categories = new LinkedHashMap<>();
+
+        for (Submission s : submissionRepository.findByInternId(internId)) {
+            Assignment a = s.getAssignment();
+            if (a == null) {
+                continue;
+            }
+            Integer score = s.getScore();
+            Integer maxScore = a.getMaxScore();
+            // Percentage only when a real score and a positive max exist; never
+            // fabricated for an ungraded submission.
+            Integer percentage = null;
+            if (score != null && maxScore != null && maxScore > 0) {
+                percentage = (int) Math.round(score * 100.0 / maxScore);
+            }
+            String status = s.getStatus() == null ? null : s.getStatus().name();
+
+            GradeSummary.AssignmentScore line = new GradeSummary.AssignmentScore(
+                    a.getId(), a.getTitle(), score, maxScore, percentage, status);
+
+            String training = a.getTrainingName() == null ? "" : a.getTrainingName().trim();
+            if (training.isEmpty()) {
+                // Independent assignment: shown on its own, not lumped into a group.
+                summary.independentAssignments.add(line);
+                continue;
+            }
+
+            GradeSummary.Category category = categories.computeIfAbsent(
+                    training, GradeSummary.Category::new);
+            category.assignments.add(line);
+            category.assignmentCount++;
+            // Only graded scores feed the category total; ungraded ones are skipped
+            // entirely rather than treated as zero.
+            if (score != null && maxScore != null) {
+                category.gradedCount++;
+                category.totalScore = (category.totalScore == null ? 0 : category.totalScore) + score;
+                category.totalMaxScore = (category.totalMaxScore == null ? 0 : category.totalMaxScore) + maxScore;
+            }
+        }
+
+        // Finalise each category's percentage once its graded totals are known.
+        for (GradeSummary.Category category : categories.values()) {
+            if (category.totalScore != null && category.totalMaxScore != null
+                    && category.totalMaxScore > 0) {
+                category.totalPercentage = (int) Math.round(
+                        category.totalScore * 100.0 / category.totalMaxScore);
+            }
+            summary.categories.add(category);
+        }
+        return summary;
     }
 
     // Shared progress math for one intern: how many assignments are done and the
@@ -250,13 +391,58 @@ public class InternResource {
         return Response.ok(result).build();
     }
 
+    // Archive an entire batch to one non-active status (ADMIN). Records are never
+    // deleted — every intern in the cohort simply moves to the chosen status.
+    // ACTIVE is rejected here: reactivation is a per-intern action via /status.
+    @POST
+    @Path("/batch/archive")
+    @RolesAllowed("ADMIN")
+    public Response archiveBatch(BatchArchiveRequest req) {
+        if (req == null || req.batch == null || req.batch.isBlank()) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity("{\"error\":\"Batch is required.\"}").build();
+        }
+        if (req.status == null || req.status.isBlank()) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity("{\"error\":\"Status is required.\"}").build();
+        }
+        Intern.Status status = parseStatus(req.status);
+        if (status == null) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity("{\"error\":\"Invalid status \\\"" + req.status + "\\\".\"}").build();
+        }
+        if (status == Intern.Status.ACTIVE) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity("{\"error\":\"Batch archive cannot set interns to ACTIVE.\"}").build();
+        }
+
+        String batch = req.batch.trim();
+        List<Intern> interns = internRepository.findByBatch(batch);
+        if (interns.isEmpty()) {
+            return Response.status(Response.Status.NOT_FOUND)
+                    .entity("{\"error\":\"No interns found in batch \\\"" + batch + "\\\".\"}").build();
+        }
+
+        for (Intern intern : interns) {
+            intern.setStatus(status);
+            internRepository.save(intern);
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("batch", batch);
+        result.put("status", status.name());
+        result.put("internsUpdated", interns.size());
+        return Response.ok(result).build();
+    }
+
     // ---- Training History ----
 
     // View an intern's trainings and their GitHub links (ADMIN + TRAINER).
     @GET
     @Path("/{id}/trainings")
     public Response getTrainings(@PathParam("id") Long internId) {
-        if (internRepository.findById(internId) == null) {
+        Intern intern = internRepository.findById(internId);
+        if (intern == null || !canView(intern)) {
             return Response.status(Response.Status.NOT_FOUND).entity("Intern not found").build();
         }
         return Response.ok(trainingRepository.findByInternId(internId)).build();
@@ -360,5 +546,43 @@ public class InternResource {
 
     private double round2(double v) {
         return Math.round(v * 100.0) / 100.0;
+    }
+
+    // Small JSON error response helper, matching the inline style used elsewhere
+    // in this resource.
+    private Response error(Response.Status status, String message) {
+        return Response.status(status).entity("{\"error\":\"" + message + "\"}").build();
+    }
+
+    // Trim a text field and collapse empty/blank input to null so cleared form
+    // fields do not persist as empty strings.
+    private String blankToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    // Total hours must be zero or positive; a negative value is treated as unset
+    // rather than stored, so the field can never go below zero.
+    private Double sanitizeHours(Double hours) {
+        if (hours == null || hours < 0) {
+            return null;
+        }
+        return hours;
+    }
+
+    // Parse a status name to the enum, tolerating surrounding whitespace and case.
+    // Returns null for an unknown value so callers can reject with a 400.
+    private Intern.Status parseStatus(String value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Intern.Status.valueOf(value.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 }

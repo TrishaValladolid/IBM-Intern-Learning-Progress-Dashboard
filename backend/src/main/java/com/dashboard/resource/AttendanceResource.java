@@ -51,11 +51,29 @@ public class AttendanceResource {
     @Inject
     private UserRepository userRepository;
 
+    @Context
+    private SecurityContext securityContext;
+
+    // Admins see every intern; trainers only ACTIVE ones (legacy NULL counts as
+    // active). Enforced here so a trainer cannot reach an archived record through
+    // an attendance endpoint by calling the API directly.
+    private boolean isAdmin() {
+        return securityContext.isUserInRole("ADMIN");
+    }
+
+    // True when the caller may see this intern: admins always, trainers only
+    // while the intern is ACTIVE.
+    private boolean canView(Intern intern) {
+        return isAdmin() || intern.getStatus() == Intern.Status.ACTIVE;
+    }
+
     // ---- View (ADMIN + TRAINER) ----
 
     @GET
     public List<AttendanceResponse> getAll() {
         return attendanceRepository.findAll().stream()
+                // Trainers must not receive attendance for archived interns.
+                .filter(a -> canView(a.getIntern()))
                 .map(AttendanceResponse::from)
                 .collect(Collectors.toList());
     }
@@ -64,7 +82,9 @@ public class AttendanceResource {
     @Path("/interns/{internId}/history")
     public Response getHistory(@PathParam("internId") Long internId) {
         Intern intern = internRepository.findById(internId);
-        if (intern == null) {
+        // Trainers get 404 for archived interns so the endpoint does not reveal
+        // that an archived record exists.
+        if (intern == null || !canView(intern)) {
             return error(Response.Status.NOT_FOUND, "Intern not found.");
         }
         List<AttendanceResponse> history = attendanceRepository.findByInternId(internId).stream()
@@ -82,7 +102,8 @@ public class AttendanceResource {
         long late;
         long absent;
         if (internId != null) {
-            if (internRepository.findById(internId) == null) {
+            Intern intern = internRepository.findById(internId);
+            if (intern == null || !canView(intern)) {
                 return error(Response.Status.NOT_FOUND, "Intern not found.");
             }
             present = attendanceRepository.countByInternIdAndStatus(internId, Attendance.Status.PRESENT);
@@ -104,7 +125,9 @@ public class AttendanceResource {
     @GET
     @Path("/trainings")
     public List<String> getTrainings() {
-        return internRepository.findDistinctBatches();
+        // Trainers only see batches that still have active interns.
+        return isAdmin() ? internRepository.findDistinctBatches()
+                : internRepository.findDistinctActiveBatches();
     }
 
     // Every intern in the selected training, prefilled with any status already
@@ -175,8 +198,10 @@ public class AttendanceResource {
                 return error(Response.Status.NOT_FOUND,
                         "Intern not found: " + entry.internId + ".");
             }
-            // Only accept interns that belong to the selected training.
-            if (!req.batch.equals(intern.getBatch())) {
+            // Only accept interns that belong to the selected training, and skip
+            // any the caller may not see (archived interns for a trainer) so a
+            // direct API call cannot mark attendance on an archived record.
+            if (!req.batch.equals(intern.getBatch()) || !canView(intern)) {
                 continue;
             }
 
@@ -202,7 +227,10 @@ public class AttendanceResource {
         for (Attendance a : attendanceRepository.findByBatchAndDate(batch, day)) {
             statusByIntern.put(a.getIntern().getId(), a.getStatus());
         }
-        return internRepository.findByBatch(batch).stream()
+        // Admins see the whole cohort; trainers only its active interns.
+        List<Intern> roster = isAdmin() ? internRepository.findByBatch(batch)
+                : internRepository.findByBatchActive(batch);
+        return roster.stream()
                 .map(i -> {
                     Attendance.Status status = statusByIntern.get(i.getId());
                     return new AttendanceRosterEntry(

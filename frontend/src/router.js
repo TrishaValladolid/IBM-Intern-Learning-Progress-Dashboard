@@ -5,6 +5,7 @@ import AdminDashboard from './views/AdminDashboard.vue'
 import TrainerDashboard from './views/TrainerDashboard.vue'
 import InternsView from './views/InternsView.vue'
 import AssignmentsView from './views/AssignmentsView.vue'
+import AssignmentManagerView from './views/AssignmentManagerView.vue'
 import InternProgressView from './views/InternProgressView.vue'
 // Placeholder module pages (dashboard foundation — no functionality yet).
 import TrainersView from './views/TrainersView.vue'
@@ -24,6 +25,7 @@ const routes = [
   // Shared authenticated pages (both roles may view).
   { path: '/interns', component: InternsView, meta: { roles: ['ADMIN', 'TRAINER'] } },
   { path: '/assignments', component: AssignmentsView, meta: { roles: ['ADMIN', 'TRAINER'] } },
+  { path: '/assignments/manage', component: AssignmentManagerView, meta: { roles: ['ADMIN'] } },
   { path: '/interns/:id/progress', component: InternProgressView, meta: { roles: ['ADMIN', 'TRAINER'] } },
   { path: '/reports', component: ReportsView, meta: { roles: ['ADMIN', 'TRAINER'] } },
 

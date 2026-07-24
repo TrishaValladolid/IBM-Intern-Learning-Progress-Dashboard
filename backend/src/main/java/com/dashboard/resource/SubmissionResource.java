@@ -10,8 +10,10 @@ import com.dashboard.repository.SubmissionRepository;
 import com.dashboard.security.Secured;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.SecurityContext;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -29,6 +31,17 @@ public class SubmissionResource {
     @Inject
     private AssignmentRepository assignmentRepository;
 
+    @Context
+    private SecurityContext securityContext;
+
+    // Trainers may only act on ACTIVE interns (legacy NULL counts as active);
+    // admins on any. Enforced here so a trainer cannot record a submission for an
+    // archived intern by calling the API directly.
+    private boolean canView(Intern intern) {
+        return securityContext.isUserInRole("ADMIN")
+                || intern.getStatus() == Intern.Status.ACTIVE;
+    }
+
     public static class SubmissionRequest {
         public Long internId;
         public Long assignmentId;
@@ -42,6 +55,8 @@ public class SubmissionResource {
     @GET
     public List<GradeCell> getAllGrades() {
         return submissionRepository.findAll().stream()
+                // Trainers must not receive grade cells for archived interns.
+                .filter(s -> canView(s.getIntern()))
                 .map(s -> new GradeCell(s.getIntern().getId(),
                         s.getAssignment().getId(), s.getScore()))
                 .collect(Collectors.toList());
@@ -50,7 +65,9 @@ public class SubmissionResource {
     @POST
     public Response recordSubmission(SubmissionRequest req) {
         Intern intern = internRepository.findById(req.internId);
-        if (intern == null) {
+        // Trainers get 404 for archived interns so the endpoint does not reveal
+        // that an archived record exists.
+        if (intern == null || !canView(intern)) {
             return Response.status(Response.Status.NOT_FOUND).entity("Intern not found").build();
         }
         Assignment assignment = assignmentRepository.findById(req.assignmentId);

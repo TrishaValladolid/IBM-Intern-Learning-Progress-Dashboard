@@ -7,12 +7,19 @@ import Modal from '../components/Modal.vue'
 
 const route = useRoute()
 const progress = ref(null)
+const intern = ref(null)
 const assignments = ref([])
 const grades = ref([]) // this intern's recorded grades (GradeCell[])
 const attendance = ref(null) // this intern's AttendanceSummary
 const scoreForm = ref({ assignmentId: '', score: '' })
 const error = ref('')
 const scoreError = ref('')
+const gradeSummary = ref(null)
+const feedback = ref([])
+const feedbackForm = ref({ content: '' })
+const feedbackError = ref('')
+const feedbackLoading = ref(false)
+const editingFeedbackId = ref(null)
 
 // The assignment currently picked in the score form, so we can bound the score
 // input by its maxScore (can't grade 100 on a 50-point assignment).
@@ -27,6 +34,9 @@ const trainings = ref([])
 const trainingError = ref('')
 const editDialog = ref(false)
 const editForm = ref({ id: null, trainingName: '' })
+const profileDialog = ref(false)
+const profileForm = ref({})
+const profileError = ref('')
 
 async function loadProgress() {
   try {
@@ -35,6 +45,105 @@ async function loadProgress() {
   } catch (e) {
     error.value = 'Could not load progress. Is the backend running?'
   }
+}
+
+async function loadIntern() {
+  const res = await api.get(`/interns/${route.params.id}`)
+  intern.value = res.data
+}
+
+function openProfileEdit() {
+  profileForm.value = {
+    name: intern.value.name || '', talentId: intern.value.talentId || '',
+    batch: intern.value.batch || '', track: intern.value.track || '', status: intern.value.status || 'ACTIVE',
+    totalHoursRequired: intern.value.totalHoursRequired ?? '', school: intern.value.school || '',
+    course: intern.value.course || '', expectedGraduationDate: intern.value.expectedGraduationDate || '',
+    expectedInternshipEndDate: intern.value.expectedInternshipEndDate || '',
+  }
+  profileError.value = ''
+  profileDialog.value = true
+}
+
+async function saveProfile() {
+  profileError.value = ''
+  if (!profileForm.value.name.trim()) { profileError.value = 'Name is required.'; return }
+  if (profileForm.value.totalHoursRequired !== '' && Number(profileForm.value.totalHoursRequired) < 0) { profileError.value = 'Required hours cannot be negative.'; return }
+  try {
+    await api.put(`/interns/${route.params.id}`, {
+      ...profileForm.value,
+      totalHoursRequired: profileForm.value.totalHoursRequired === '' ? null : Number(profileForm.value.totalHoursRequired),
+    })
+    profileDialog.value = false
+    await loadIntern()
+  } catch (e) {
+    profileError.value = e.response?.data?.error || 'Could not update the intern profile.'
+  }
+}
+
+async function loadGradeSummary() {
+  const res = await api.get(`/interns/${route.params.id}/grades`)
+  gradeSummary.value = res.data
+}
+
+async function loadFeedback() {
+  feedbackLoading.value = true
+  try {
+    const res = await api.get(`/feedback?internId=${route.params.id}`)
+    feedback.value = res.data
+  } catch (e) {
+    feedbackError.value = 'Could not load teacher feedback.'
+  } finally {
+    feedbackLoading.value = false
+  }
+}
+
+function canManageFeedback(entry) {
+  return isAdmin.value || entry.authorUsername === auth.state.user?.username
+}
+
+function startEditFeedback(entry) {
+  editingFeedbackId.value = entry.id
+  feedbackForm.value.content = entry.content
+  feedbackError.value = ''
+}
+
+function cancelFeedbackEdit() {
+  editingFeedbackId.value = null
+  feedbackForm.value.content = ''
+}
+
+async function saveFeedback() {
+  const content = feedbackForm.value.content.trim()
+  if (!content) {
+    feedbackError.value = 'Feedback cannot be empty.'
+    return
+  }
+  feedbackError.value = ''
+  try {
+    if (editingFeedbackId.value) {
+      await api.put(`/feedback/${editingFeedbackId.value}`, { content })
+    } else {
+      await api.post('/feedback', { internId: Number(route.params.id), content })
+    }
+    cancelFeedbackEdit()
+    await loadFeedback()
+  } catch (e) {
+    feedbackError.value = e.response?.data?.error || 'Could not save feedback.'
+  }
+}
+
+async function deleteFeedback(entry) {
+  if (!window.confirm('Delete this feedback?')) return
+  try {
+    await api.delete(`/feedback/${entry.id}`)
+    await loadFeedback()
+  } catch (e) {
+    feedbackError.value = e.response?.data?.error || 'Could not delete feedback.'
+  }
+}
+
+function formatDate(value) {
+  return value ? new Date(value).toLocaleString() : ''
 }
 
 async function loadAssignments() {
@@ -117,7 +226,7 @@ async function submitScore() {
       status: 'GRADED',
     })
     scoreForm.value = { assignmentId: '', score: '' }
-    await Promise.all([loadProgress(), loadGrades()])
+    await Promise.all([loadProgress(), loadGrades(), loadGradeSummary()])
   } catch (e) {
     scoreError.value = e.response?.data || 'Could not save score.'
   }
@@ -166,10 +275,13 @@ async function removeTraining(t) {
 
 onMounted(() => {
   loadProgress()
+  loadIntern()
   loadAssignments()
   loadGrades()
+  loadGradeSummary()
   loadAttendance()
   loadTrainings()
+  loadFeedback()
 })
 </script>
 
@@ -212,6 +324,17 @@ onMounted(() => {
       </section>
     </template>
 
+    <section v-if="intern" class="card section">
+      <div class="section-heading"><h3 class="form-title">Intern Profile</h3><button v-if="isAdmin" class="btn btn--secondary" @click="openProfileEdit">Edit Profile</button></div>
+      <dl class="profile-grid">
+        <div><dt>School</dt><dd>{{ intern.school || 'Not recorded' }}</dd></div>
+        <div><dt>Course</dt><dd>{{ intern.course || 'Not recorded' }}</dd></div>
+        <div><dt>Required hours</dt><dd>{{ intern.totalHoursRequired ?? 'Not recorded' }}</dd></div>
+        <div><dt>Expected graduation</dt><dd>{{ intern.expectedGraduationDate || 'Not recorded' }}</dd></div>
+        <div><dt>Expected internship end</dt><dd>{{ intern.expectedInternshipEndDate || 'Not recorded' }}</dd></div>
+      </dl>
+    </section>
+
     <!-- Attendance Summary -->
     <section class="card section">
       <h3 class="form-title">Attendance Summary</h3>
@@ -234,6 +357,36 @@ onMounted(() => {
         </div>
       </div>
       <p v-else class="muted">No attendance records yet.</p>
+    </section>
+
+    <section class="card section">
+      <h3 class="form-title">Grade Summary</h3>
+      <p v-if="!gradeSummary || (!gradeSummary.categories.length && !gradeSummary.independentAssignments.length)" class="muted">No graded assignments recorded yet.</p>
+      <div v-for="category in gradeSummary?.categories || []" :key="category.trainingName" class="grade-category">
+        <div class="grade-category__header"><strong>{{ category.trainingName }}</strong><span>{{ category.totalScore ?? '—' }} / {{ category.totalMaxScore ?? '—' }}<template v-if="category.totalPercentage != null"> ({{ category.totalPercentage }}%)</template></span></div>
+        <p v-for="item in category.assignments" :key="item.assignmentId" class="grade-line">{{ item.title }}: <span v-if="item.score != null">{{ item.score }} / {{ item.maxScore }}</span><span v-else class="muted">Not graded</span></p>
+      </div>
+      <div v-if="gradeSummary?.independentAssignments?.length" class="grade-category">
+        <strong>Independent Assignments</strong>
+        <p v-for="item in gradeSummary.independentAssignments" :key="item.assignmentId" class="grade-line">{{ item.title }}: <span v-if="item.score != null">{{ item.score }} / {{ item.maxScore }}<template v-if="item.percentage != null"> ({{ item.percentage }}%)</template></span><span v-else class="muted">Not graded</span></p>
+      </div>
+    </section>
+
+    <section class="card section">
+      <h3 class="form-title">Teacher Feedback</h3>
+      <p v-if="feedbackError" class="error">{{ feedbackError }}</p>
+      <form class="feedback-form" @submit.prevent="saveFeedback">
+        <label for="feedback-content">{{ editingFeedbackId ? 'Edit feedback' : 'Add feedback' }}</label>
+        <textarea id="feedback-content" class="input" v-model="feedbackForm.content" maxlength="4000" rows="4" placeholder="Write feedback for this intern..."></textarea>
+        <div class="row-actions"><button class="btn btn--primary" type="submit">{{ editingFeedbackId ? 'Save changes' : 'Add feedback' }}</button><button v-if="editingFeedbackId" class="btn btn--secondary" type="button" @click="cancelFeedbackEdit">Cancel</button></div>
+      </form>
+      <p v-if="feedbackLoading" class="muted">Loading feedback…</p>
+      <p v-else-if="feedback.length === 0" class="muted">No teacher feedback yet.</p>
+      <article v-for="entry in feedback" :key="entry.id" class="feedback-entry">
+        <div><strong>{{ entry.authorName || entry.authorUsername }}</strong><span class="muted feedback-date">{{ formatDate(entry.createdAt) }}<template v-if="entry.updatedAt"> · Edited {{ formatDate(entry.updatedAt) }}</template></span></div>
+        <p>{{ entry.content }}</p>
+        <div v-if="canManageFeedback(entry)" class="row-actions"><button class="btn btn--ghost" @click="startEditFeedback(entry)">Edit</button><button class="btn btn--danger" @click="deleteFeedback(entry)">Delete</button></div>
+      </article>
     </section>
 
     <!-- Grades, grouped by training with a total score per training -->
@@ -371,6 +524,22 @@ onMounted(() => {
         <button class="btn btn--primary" @click="saveEdit">Save</button>
       </template>
     </Modal>
+
+    <Modal :open="profileDialog" title="Edit Intern Profile" @close="profileDialog = false">
+      <p v-if="profileError" class="error">{{ profileError }}</p>
+      <div class="profile-edit-grid">
+        <div class="field"><label for="profile-name">Name</label><input id="profile-name" class="input" v-model="profileForm.name" required /></div>
+        <div class="field"><label for="profile-talent">Talent ID</label><input id="profile-talent" class="input" v-model="profileForm.talentId" /></div>
+        <div class="field"><label for="profile-batch">Batch</label><input id="profile-batch" class="input" v-model="profileForm.batch" /></div>
+        <div class="field"><label for="profile-track">Track</label><input id="profile-track" class="input" v-model="profileForm.track" /></div>
+        <div class="field"><label for="profile-hours">Required hours</label><input id="profile-hours" class="input" type="number" min="0" v-model="profileForm.totalHoursRequired" /></div>
+        <div class="field"><label for="profile-school">School</label><input id="profile-school" class="input" v-model="profileForm.school" maxlength="255" /></div>
+        <div class="field"><label for="profile-course">Course</label><input id="profile-course" class="input" v-model="profileForm.course" maxlength="255" /></div>
+        <div class="field"><label for="profile-graduation">Expected graduation</label><input id="profile-graduation" class="input" type="date" v-model="profileForm.expectedGraduationDate" /></div>
+        <div class="field"><label for="profile-end">Expected internship end</label><input id="profile-end" class="input" type="date" v-model="profileForm.expectedInternshipEndDate" /></div>
+      </div>
+      <template #footer><button class="btn btn--secondary" @click="profileDialog = false">Cancel</button><button class="btn btn--primary" @click="saveProfile">Save Profile</button></template>
+    </Modal>
   </div>
 </template>
 
@@ -441,4 +610,17 @@ onMounted(() => {
   font-weight: 600;
   border-top: 2px solid var(--border, #e0e0e0);
 }
+.profile-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--sp-03); }
+.profile-grid dt { color: var(--text-secondary, #525252); font-size: 13px; }
+.profile-grid dd { margin: var(--sp-01) 0 0; font-weight: 600; }
+.section-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--sp-02); }
+.profile-edit-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-02); }
+@media (max-width: 600px) { .profile-edit-grid { grid-template-columns: 1fr; } }
+.grade-category { padding: var(--sp-02) 0; border-top: 1px solid var(--border, #e0e0e0); }
+.grade-category__header { display: flex; justify-content: space-between; gap: var(--sp-02); }
+.grade-line { margin: var(--sp-01) 0; }
+.feedback-form { display: grid; gap: var(--sp-02); margin-bottom: var(--sp-03); }
+.feedback-entry { border-top: 1px solid var(--border, #e0e0e0); padding: var(--sp-02) 0; }
+.feedback-entry p { white-space: pre-wrap; }
+.feedback-date { margin-left: var(--sp-02); font-size: 13px; }
 </style>
