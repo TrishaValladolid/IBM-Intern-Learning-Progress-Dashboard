@@ -1,6 +1,8 @@
 package com.dashboard.dto;
 
 import com.dashboard.entity.User;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Safe view of a {@link User} for the Trainer Management module.
@@ -14,6 +16,7 @@ public class UserResponse {
     public String role;
     public boolean enabled;
     public String createdDate;
+    public List<String> assignedTrainings;
 
     public static UserResponse from(User user) {
         UserResponse dto = new UserResponse();
@@ -24,6 +27,7 @@ public class UserResponse {
         dto.role = user.getRole() != null ? user.getRole().name() : null;
         dto.enabled = user.isEnabled();
         dto.createdDate = user.getCreatedDate() != null ? user.getCreatedDate().toString() : null;
+        dto.assignedTrainings = new ArrayList<>(user.getAssignedTrainings());
         return dto;
     }
 }

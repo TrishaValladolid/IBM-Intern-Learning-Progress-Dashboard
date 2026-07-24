@@ -9,4 +9,5 @@ public class CreateTrainerRequest {
     public String password;
     public String confirmPassword;
     public String role;
+    public java.util.List<String> assignedTrainings;
 }

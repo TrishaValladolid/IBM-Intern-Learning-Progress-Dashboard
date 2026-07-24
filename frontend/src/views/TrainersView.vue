@@ -9,8 +9,39 @@ const isAdmin = auth.isAdmin
 const currentUsername = computed(() => (auth.state.user ? auth.state.user.username : null))
 
 const trainers = ref([])
+const trainingNames = ref([])
 const loading = ref(false)
 const error = ref('')
+
+// ---- Training tag input helpers ----
+// Each form (add/edit) gets its own input ref so they don't share state.
+const addTrainingInput = ref('')
+const editTrainingInput = ref('')
+
+// Suggestions for the datalist: all known names not already in the list.
+function trainingSuggestions(current) {
+  return trainingNames.value.filter(n => !current.includes(n))
+}
+
+function addTraining(list, inputRef) {
+  // In the template, refs are auto-unwrapped, so we receive the raw ref object
+  // here only when called from script. From the template @click the arg arrives
+  // as the unwrapped string — handle both cases.
+  const val = typeof inputRef === 'string'
+    ? inputRef.trim()
+    : (inputRef && inputRef.value ? inputRef.value.trim() : '')
+  if (val && !list.includes(val)) {
+    list.push(val)
+  }
+  // Clear whichever ref owns the input.
+  if (list === addForm.value.assignedTrainings) addTrainingInput.value = ''
+  else editTrainingInput.value = ''
+}
+
+function removeTraining(list, name) {
+  const idx = list.indexOf(name)
+  if (idx !== -1) list.splice(idx, 1)
+}
 
 // ---- Search & sort (client-side) ----
 const search = ref('')
@@ -60,8 +91,9 @@ async function loadTrainers() {
   loading.value = true
   error.value = ''
   try {
-    const res = await api.get('/trainers')
+    const [res, trainingRes] = await Promise.all([api.get('/trainers'), api.get('/interns/trainings/names')])
     trainers.value = res.data
+    trainingNames.value = trainingRes.data
   } catch (e) {
     if (e.response && e.response.status === 403) {
       error.value = 'You do not have permission to view trainers.'
@@ -80,7 +112,7 @@ const saving = ref(false)
 const formError = ref('')
 
 const addForm = ref(emptyAddForm())
-const editForm = ref({ id: null, fullName: '', username: '', email: '' })
+const editForm = ref({ id: null, fullName: '', username: '', email: '', assignedTrainings: [] })
 const resetForm = ref({ id: null, newPassword: '', confirmPassword: '' })
 
 function emptyAddForm() {
@@ -92,6 +124,7 @@ function emptyAddForm() {
     password: '',
     confirmPassword: '',
     role: 'TRAINER',
+    assignedTrainings: [],
   }
 }
 
@@ -119,6 +152,7 @@ function openEdit(t) {
     fullName: t.fullName || '',
     username: t.username || '',
     email: t.email || '',
+    assignedTrainings: [...(t.assignedTrainings || [])],
   }
   formError.value = ''
   dialog.value = 'edit'
@@ -186,6 +220,7 @@ async function submitEdit() {
       fullName: f.fullName,
       username: f.username,
       email: f.email,
+      assignedTrainings: f.assignedTrainings,
     })
     closeDialog()
     await loadTrainers()
@@ -279,6 +314,7 @@ onMounted(loadTrainers)
             </th>
             <th>Email</th>
             <th>Role</th>
+            <th>Assigned Trainings</th>
             <th>Account Status</th>
             <th>Created Date</th>
             <th class="col-action"></th>
@@ -286,13 +322,14 @@ onMounted(loadTrainers)
         </thead>
         <tbody>
           <tr v-if="visibleTrainers.length === 0">
-            <td colspan="7" class="muted">No trainers found.</td>
+            <td colspan="8" class="muted">No trainers found.</td>
           </tr>
           <tr v-for="t in visibleTrainers" :key="t.id">
             <td>{{ t.fullName }}</td>
             <td>{{ t.username }}</td>
             <td>{{ t.email || '—' }}</td>
             <td>{{ t.role }}</td>
+            <td>{{ t.assignedTrainings?.length ? t.assignedTrainings.join(', ') : 'All assignments' }}</td>
             <td>
               <span
                 class="status-pill"
@@ -342,6 +379,30 @@ onMounted(loadTrainers)
             <option value="ADMIN">Admin</option>
           </select>
         </div>
+        <div class="field">
+          <label>Assigned trainings</label>
+          <div class="tag-list" v-if="addForm.assignedTrainings.length">
+            <span v-for="t in addForm.assignedTrainings" :key="t" class="tag">
+              {{ t }}
+              <button type="button" class="tag-remove" @click="removeTraining(addForm.assignedTrainings, t)" aria-label="Remove">×</button>
+            </span>
+          </div>
+          <div class="tag-input-row">
+            <input
+              id="add-trainings"
+              class="input"
+              v-model="addTrainingInput"
+              list="add-training-list"
+              placeholder="Type or pick a training, then Add"
+              @keydown.enter.prevent="addTraining(addForm.assignedTrainings, addTrainingInput)"
+            />
+            <datalist id="add-training-list">
+              <option v-for="n in trainingSuggestions(addForm.assignedTrainings)" :key="n" :value="n" />
+            </datalist>
+            <button type="button" class="btn btn--secondary" @click="addTraining(addForm.assignedTrainings, addTrainingInput)">Add</button>
+          </div>
+          <p class="muted field-hint">Leave empty to let this trainer view all assignments.</p>
+        </div>
         <p v-if="formError" class="error">{{ formError }}</p>
       </form>
       <template #footer>
@@ -358,6 +419,30 @@ onMounted(loadTrainers)
         <BaseInput v-model="editForm.fullName" label="Full name" />
         <BaseInput v-model="editForm.username" label="Username" autocomplete="off" />
         <BaseInput v-model="editForm.email" label="Email" type="email" autocomplete="off" />
+        <div class="field">
+          <label>Assigned trainings</label>
+          <div class="tag-list" v-if="editForm.assignedTrainings.length">
+            <span v-for="t in editForm.assignedTrainings" :key="t" class="tag">
+              {{ t }}
+              <button type="button" class="tag-remove" @click="removeTraining(editForm.assignedTrainings, t)" aria-label="Remove">×</button>
+            </span>
+          </div>
+          <div class="tag-input-row">
+            <input
+              id="edit-trainings"
+              class="input"
+              v-model="editTrainingInput"
+              list="edit-training-list"
+              placeholder="Type or pick a training, then Add"
+              @keydown.enter.prevent="addTraining(editForm.assignedTrainings, editTrainingInput)"
+            />
+            <datalist id="edit-training-list">
+              <option v-for="n in trainingSuggestions(editForm.assignedTrainings)" :key="n" :value="n" />
+            </datalist>
+            <button type="button" class="btn btn--secondary" @click="addTraining(editForm.assignedTrainings, editTrainingInput)">Add</button>
+          </div>
+          <p class="muted field-hint">Leave empty to let this trainer view all assignments.</p>
+        </div>
         <p v-if="formError" class="error">{{ formError }}</p>
       </form>
       <template #footer>
@@ -375,6 +460,7 @@ onMounted(loadTrainers)
         <div><dt>Username</dt><dd>{{ selected.username }}</dd></div>
         <div><dt>Email</dt><dd>{{ selected.email || '—' }}</dd></div>
         <div><dt>Role</dt><dd>{{ selected.role }}</dd></div>
+        <div><dt>Assigned trainings</dt><dd>{{ selected.assignedTrainings?.length ? selected.assignedTrainings.join(', ') : 'All assignments' }}</dd></div>
         <div>
           <dt>Account status</dt>
           <dd>
@@ -494,5 +580,51 @@ onMounted(loadTrainers)
 }
 .reset-hint {
   margin-bottom: var(--sp-02);
+}
+.field-hint { margin: var(--sp-01) 0 0; font-size: 12px; }
+
+/* ---- Training tag input ---- */
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: var(--sp-01);
+}
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--blue-10);
+  border: 1px solid var(--blue-60);
+  color: var(--blue-60);
+  font-size: 13px;
+  padding: 2px 8px 2px 10px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+.tag-remove {
+  background: none;
+  border: none;
+  color: var(--blue-60);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  display: inline-flex;
+  align-items: center;
+}
+.tag-remove:hover {
+  color: var(--support-error);
+}
+.tag-input-row {
+  display: flex;
+  gap: var(--sp-01);
+  align-items: stretch;
+}
+.tag-input-row .input {
+  flex: 1;
+}
+.tag-input-row .btn {
+  flex-shrink: 0;
 }
 </style>

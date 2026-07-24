@@ -50,9 +50,14 @@ public class UserRepository {
     public User save(User user) {
         if (user.getId() == null) {
             em.persist(user);
+            em.flush();
+            em.refresh(user);
             return user;
         }
-        return em.merge(user);
+        User merged = em.merge(user);
+        em.flush();
+        em.refresh(merged);
+        return merged;
     }
 
     public long count() {

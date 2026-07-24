@@ -18,6 +18,8 @@ import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.SecurityContext;
 
 import java.util.List;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -88,6 +90,7 @@ public class TrainerResource {
         user.setEmail(email.isEmpty() ? null : email);
         user.setPasswordHash(PasswordUtil.hash(req.password));
         user.setRole(parseRole(req.role));
+        user.setAssignedTrainings(normalizeTrainings(req.assignedTrainings));
         user.setEnabled(true);
 
         User saved = userRepository.save(user);
@@ -123,6 +126,7 @@ public class TrainerResource {
         existing.setFullName(fullName);
         existing.setUsername(username);
         existing.setEmail(email.isEmpty() ? null : email);
+        existing.setAssignedTrainings(normalizeTrainings(req.assignedTrainings));
         return Response.ok(UserResponse.from(userRepository.save(existing))).build();
     }
 
@@ -196,6 +200,17 @@ public class TrainerResource {
 
     private String trim(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private Set<String> normalizeTrainings(List<String> values) {
+        Set<String> result = new LinkedHashSet<>();
+        if (values != null) {
+            for (String value : values) {
+                String training = trim(value);
+                if (!training.isEmpty()) result.add(training);
+            }
+        }
+        return result;
     }
 
     private Response error(Response.Status status, String message) {

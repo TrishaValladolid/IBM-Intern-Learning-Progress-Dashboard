@@ -3,6 +3,8 @@ package com.dashboard.entity;
 import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 /**
  * Application user account. Only two roles exist in this system:
@@ -39,6 +41,12 @@ public class User {
 
     @Column(name = "created_date")
     private LocalDateTime createdDate;
+
+    // Empty means the trainer is not restricted to particular training areas.
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_training_assignment", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "training_name", length = 255)
+    private Set<String> assignedTrainings = new LinkedHashSet<>();
 
     public User() {}
 
@@ -79,6 +87,11 @@ public class User {
 
     public LocalDateTime getCreatedDate() { return createdDate; }
     public void setCreatedDate(LocalDateTime createdDate) { this.createdDate = createdDate; }
+
+    public Set<String> getAssignedTrainings() { return assignedTrainings; }
+    public void setAssignedTrainings(Set<String> assignedTrainings) {
+        this.assignedTrainings = assignedTrainings == null ? new LinkedHashSet<>() : new LinkedHashSet<>(assignedTrainings);
+    }
 
     public enum Role {
         ADMIN,

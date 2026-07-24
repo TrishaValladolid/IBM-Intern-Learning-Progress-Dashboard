@@ -5,4 +5,5 @@ public class UpdateTrainerRequest {
     public String fullName;
     public String username;
     public String email;
+    public java.util.List<String> assignedTrainings;
 }

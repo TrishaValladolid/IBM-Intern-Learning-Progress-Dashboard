@@ -1,0 +1,32 @@
+-- ============================================================
+--  Learning Progress Dashboard - Seed Data
+--  PostgreSQL 14+
+--
+--  Run schema.sql FIRST, then this file.
+--
+--  Usage:
+--    psql -U postgres -d progress_dashboard -f seed.sql
+--
+--  This file is OPTIONAL.
+--
+--  The application automatically seeds two default accounts on
+--  first boot (StartupDataSeeder.java) whenever the app_user
+--  table is empty:
+--
+--    Username : admin       Password : admin123   Role : ADMIN
+--    Username : trainer     Password : trainer123  Role : TRAINER
+--
+--  You do NOT need to run this file manually. Just deploy the WAR,
+--  start WildFly, and the accounts will be created automatically.
+--
+--  This file exists only as documentation/reference. The passwords
+--  use PBKDF2WithHmacSHA256 with a random per-user salt generated
+--  at runtime, so portable pre-computed INSERT statements cannot be
+--  provided here.
+--
+--  IMPORTANT: Change the default passwords immediately after first
+--  login. Use the Trainers page (Admin role) to reset passwords.
+-- ============================================================
+
+-- No INSERT statements are needed here.
+-- Deploy the WAR and let StartupDataSeeder handle account creation.
