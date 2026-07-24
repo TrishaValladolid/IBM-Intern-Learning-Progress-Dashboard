@@ -40,6 +40,17 @@ function scoreFor(internId, assignmentId) {
   return s === undefined || s === null ? '—' : s
 }
 
+// Training options for a dropdown, including the row's current value even when
+// it's no longer in the distinct list (e.g. the training was later renamed or
+// removed). Without this the <select> would show blank and silently drop the
+// tag on save.
+function trainingOptionsFor(current) {
+  if (current && !trainingNames.value.includes(current)) {
+    return [current, ...trainingNames.value]
+  }
+  return trainingNames.value
+}
+
 // Distinct, non-empty batches from the interns (for the batch filter).
 const batches = computed(() => {
   const set = new Set(interns.value.map((i) => i.batch).filter((b) => b && b.trim()))
@@ -124,8 +135,11 @@ async function saveAssignment(draft) {
   await loadMatrix()
 }
 
-async function removeAssignment(id) {
-  await api.delete(`/assignments/${id}`)
+async function removeAssignment(draft) {
+  if (!window.confirm(`Delete "${draft.title}"? This also removes its recorded grades and cannot be undone.`)) {
+    return
+  }
+  await api.delete(`/assignments/${draft.id}`)
   await loadMatrix()
   openManage()
 }
@@ -226,7 +240,7 @@ onMounted(loadMatrix)
           <label for="a-training">Training</label>
           <select id="a-training" class="select" v-model="newForm.trainingName">
             <option value="">None (independent)</option>
-            <option v-for="t in trainingNames" :key="t" :value="t">{{ t }}</option>
+            <option v-for="t in trainingOptionsFor(newForm.trainingName)" :key="t" :value="t">{{ t }}</option>
           </select>
         </div>
         <div class="field field--max">
@@ -260,7 +274,7 @@ onMounted(loadMatrix)
           <div class="field">
             <select class="select" v-model="d.trainingName">
               <option value="">None (independent)</option>
-              <option v-for="t in trainingNames" :key="t" :value="t">{{ t }}</option>
+              <option v-for="t in trainingOptionsFor(d.trainingName)" :key="t" :value="t">{{ t }}</option>
             </select>
           </div>
           <div class="field field--max">
@@ -277,7 +291,7 @@ onMounted(loadMatrix)
           </div>
           <div class="manage-row-actions">
             <button class="btn btn--secondary btn--sm" @click="saveAssignment(d)">Save</button>
-            <button class="btn btn--danger btn--sm" @click="removeAssignment(d.id)">Delete</button>
+            <button class="btn btn--danger btn--sm" @click="removeAssignment(d)">Delete</button>
           </div>
         </li>
       </ul>

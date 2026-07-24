@@ -152,6 +152,9 @@ async function saveEdit() {
 }
 
 async function removeTraining(t) {
+  if (!window.confirm(`Remove "${t.trainingName}" from this intern? This cannot be undone.`)) {
+    return
+  }
   trainingError.value = ''
   try {
     await api.delete(`/interns/${route.params.id}/trainings/${t.id}`)
