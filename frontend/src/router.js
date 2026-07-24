@@ -10,7 +10,6 @@ import InternProgressView from './views/InternProgressView.vue'
 import TrainersView from './views/TrainersView.vue'
 import BatchesView from './views/BatchesView.vue'
 import ReportsView from './views/ReportsView.vue'
-import MyBatchesView from './views/MyBatchesView.vue'
 import AttendanceView from './views/AttendanceView.vue'
 import ProgressTrackingView from './views/ProgressTrackingView.vue'
 
@@ -33,7 +32,6 @@ const routes = [
   { path: '/batches', component: BatchesView, meta: { roles: ['ADMIN'] } },
 
   // Trainer-only module pages.
-  { path: '/my-batches', component: MyBatchesView, meta: { roles: ['TRAINER'] } },
   { path: '/attendance', component: AttendanceView, meta: { roles: ['ADMIN', 'TRAINER'] } },
   { path: '/progress-tracking', component: ProgressTrackingView, meta: { roles: ['TRAINER'] } },
 

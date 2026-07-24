@@ -11,6 +11,16 @@ const form = ref({ name: '', talentId: '', batch: '', track: '' })
 const loading = ref(false)
 const error = ref('')
 
+// ---- Filters ----
+// Batch is derived from the interns themselves; assignment + attendance need the
+// grade cells and per-intern attendance, loaded once and joined client-side.
+const assignments = ref([]) // [{ id, title, maxScore }] for the assignment dropdown
+const internsByAssignment = ref(new Map()) // assignmentId -> Set(internId with a grade)
+const attendanceByIntern = ref(new Map()) // internId -> attendance percentage
+const filterBatch = ref('')
+const filterAssignment = ref('')
+const filterAttendance = ref('') // '' | 'good' (>=75%) | 'low' (<75%)
+
 // ---- Assign training to a batch ----
 const batchDialog = ref(false)
 const batchForm = ref({ trainingName: '', repoUrl: '', batch: '' })
@@ -30,11 +40,73 @@ async function loadInterns() {
   try {
     const res = await api.get('/interns')
     interns.value = res.data
+    // Load the extra data the assignment/attendance filters need. Non-fatal:
+    // the roster still renders (and the batch filter still works) if these fail.
+    await loadFilterData()
   } catch (e) {
     error.value = 'Could not load interns. Is the backend running?'
   } finally {
     loading.value = false
   }
+}
+
+// Loads the data behind the assignment + attendance filters:
+//  - assignments feed the assignment dropdown,
+//  - /submissions (flat grade cells) tell us which interns have a grade per assignment,
+//  - /attendance/summary (per intern) gives the attendance % used for the status buckets.
+async function loadFilterData() {
+  try {
+    const [assignmentsRes, submissionsRes] = await Promise.all([
+      api.get('/assignments'),
+      api.get('/submissions'),
+    ])
+    assignments.value = assignmentsRes.data
+    const byAssignment = new Map()
+    for (const s of submissionsRes.data) {
+      if (!byAssignment.has(s.assignmentId)) byAssignment.set(s.assignmentId, new Set())
+      byAssignment.get(s.assignmentId).add(String(s.internId))
+    }
+    internsByAssignment.value = byAssignment
+
+    // Attendance has no bulk endpoint, so fan out one call per intern.
+    const attMap = new Map()
+    await Promise.all(
+      interns.value.map(async (i) => {
+        try {
+          const res = await api.get(`/attendance/summary?internId=${i.id}`)
+          attMap.set(String(i.id), res.data.attendancePercentage ?? 0)
+        } catch (e) {
+          attMap.set(String(i.id), 0)
+        }
+      }),
+    )
+    attendanceByIntern.value = attMap
+  } catch (e) {
+    // Leave the filters with whatever data loaded; batch filter is unaffected.
+  }
+}
+
+// Interns after applying the batch / assignment / attendance filters (AND-combined).
+const filteredInterns = computed(() =>
+  interns.value.filter((i) => {
+    if (filterBatch.value && i.batch !== filterBatch.value) return false
+    if (filterAssignment.value) {
+      const ids = internsByAssignment.value.get(Number(filterAssignment.value))
+      if (!ids || !ids.has(String(i.id))) return false
+    }
+    if (filterAttendance.value) {
+      const pct = attendanceByIntern.value.get(String(i.id)) ?? 0
+      if (filterAttendance.value === 'good' && pct < 75) return false
+      if (filterAttendance.value === 'low' && pct >= 75) return false
+    }
+    return true
+  }),
+)
+
+function resetFilters() {
+  filterBatch.value = ''
+  filterAssignment.value = ''
+  filterAttendance.value = ''
 }
 
 function openBatchDialog() {
@@ -126,28 +198,62 @@ onMounted(loadInterns)
     </section>
 
     <p v-if="loading" class="muted">Loading…</p>
-    <div v-else class="table-wrap">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Name</th><th>Talent ID</th><th>Batch</th><th>Track</th><th v-if="isAdmin" class="col-action"></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="i in interns" :key="i.id">
-            <td>
-              <router-link :to="`/interns/${i.id}/progress`">{{ i.name }}</router-link>
-            </td>
-            <td>{{ i.talentId }}</td>
-            <td>{{ i.batch }}</td>
-            <td>{{ i.track }}</td>
-            <td v-if="isAdmin" class="col-action">
-              <button class="btn btn--danger" @click="removeIntern(i.id)">Delete</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <template v-else>
+      <!-- Filters: batch / assignment / attendance status (AND-combined) -->
+      <section class="card section filter-bar">
+        <div class="field">
+          <label for="filter-batch">Batch</label>
+          <select id="filter-batch" class="select" v-model="filterBatch">
+            <option value="">All batches</option>
+            <option v-for="b in batches" :key="b" :value="b">{{ b }}</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="filter-assignment">Assignment</label>
+          <select id="filter-assignment" class="select" v-model="filterAssignment">
+            <option value="">All assignments</option>
+            <option v-for="a in assignments" :key="a.id" :value="a.id">{{ a.title }}</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="filter-attendance">Attendance status</label>
+          <select id="filter-attendance" class="select" v-model="filterAttendance">
+            <option value="">All attendance</option>
+            <option value="good">Good (≥ 75%)</option>
+            <option value="low">Low (&lt; 75%)</option>
+          </select>
+        </div>
+        <div class="field field--action">
+          <button class="btn btn--ghost" @click="resetFilters">Clear</button>
+        </div>
+      </section>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Name</th><th>Talent ID</th><th>Batch</th><th>Track</th><th v-if="isAdmin" class="col-action"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="filteredInterns.length === 0">
+              <td :colspan="isAdmin ? 5 : 4" class="muted">No interns match the current filters.</td>
+            </tr>
+            <tr v-for="i in filteredInterns" :key="i.id">
+              <td>
+                <router-link :to="`/interns/${i.id}/progress`">{{ i.name }}</router-link>
+              </td>
+              <td>{{ i.talentId }}</td>
+              <td>{{ i.batch }}</td>
+              <td>{{ i.track }}</td>
+              <td v-if="isAdmin" class="col-action">
+                <button class="btn btn--danger" @click="removeIntern(i.id)">Delete</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </template>
 
     <!-- Assign training to a batch (ADMIN) -->
     <Modal :open="batchDialog" title="Assign training to batch" @close="batchDialog = false">
@@ -216,6 +322,20 @@ onMounted(loadInterns)
   text-align: right;
   width: 1%;
   white-space: nowrap;
+}
+.filter-bar {
+  display: flex;
+  gap: var(--sp-02);
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.filter-bar .field {
+  flex: 1 1 180px;
+  min-width: 160px;
+}
+.filter-bar .field--action {
+  flex: 0 0 auto;
+  min-width: 0;
 }
 .header-row {
   display: flex;

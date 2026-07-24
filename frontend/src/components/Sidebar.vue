@@ -35,7 +35,6 @@ const adminItems = [
 const trainerItems = [
   { label: 'Dashboard', to: '/trainer', icon: 'dashboard' },
   { label: 'Interns', to: '/interns', icon: 'interns' },
-  { label: 'My Batches', to: '/my-batches', icon: 'batches' },
   { label: 'Assignments and Grades', to: '/assignments', icon: 'assignments' },
   { label: 'Attendance', to: '/attendance', icon: 'attendance' },
   { label: 'Progress Tracking', to: '/progress-tracking', icon: 'progress' },

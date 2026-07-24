@@ -8,6 +8,8 @@ import Modal from '../components/Modal.vue'
 const route = useRoute()
 const progress = ref(null)
 const assignments = ref([])
+const grades = ref([]) // this intern's recorded grades (GradeCell[])
+const attendance = ref(null) // this intern's AttendanceSummary
 const scoreForm = ref({ assignmentId: '', score: '' })
 const error = ref('')
 const scoreError = ref('')
@@ -40,6 +42,41 @@ async function loadAssignments() {
   assignments.value = res.data
 }
 
+// Grades: the flat /submissions feed (GradeCell: internId, assignmentId, score)
+// filtered to this intern. Joined to assignment titles/maxScore for display.
+async function loadGrades() {
+  const res = await api.get('/submissions')
+  grades.value = res.data.filter((g) => String(g.internId) === String(route.params.id))
+}
+
+// Attendance summary for this intern (present/late/absent + percentage).
+async function loadAttendance() {
+  try {
+    const res = await api.get(`/attendance/summary?internId=${route.params.id}`)
+    attendance.value = res.data
+  } catch (e) {
+    // Non-fatal: the rest of the page still renders without attendance.
+    attendance.value = null
+  }
+}
+
+// Join each recorded grade to its assignment so we can show title + percentage.
+const gradeRows = computed(() =>
+  grades.value.map((g) => {
+    const a = assignments.value.find((x) => x.id === g.assignmentId)
+    const maxScore = a?.maxScore ?? null
+    const pct =
+      g.score != null && maxScore ? Math.round((g.score / maxScore) * 100) : null
+    return {
+      assignmentId: g.assignmentId,
+      title: a?.title || `Assignment #${g.assignmentId}`,
+      score: g.score,
+      maxScore,
+      pct,
+    }
+  }),
+)
+
 async function submitScore() {
   scoreError.value = ''
   if (!scoreForm.value.assignmentId || scoreForm.value.score === '') return
@@ -59,7 +96,7 @@ async function submitScore() {
       status: 'GRADED',
     })
     scoreForm.value = { assignmentId: '', score: '' }
-    await loadProgress()
+    await Promise.all([loadProgress(), loadGrades()])
   } catch (e) {
     scoreError.value = e.response?.data || 'Could not save score.'
   }
@@ -106,6 +143,8 @@ async function removeTraining(t) {
 onMounted(() => {
   loadProgress()
   loadAssignments()
+  loadGrades()
+  loadAttendance()
   loadTrainings()
 })
 </script>
@@ -148,6 +187,62 @@ onMounted(() => {
         </div>
       </section>
     </template>
+
+    <!-- Attendance Summary -->
+    <section class="card section">
+      <h3 class="form-title">Attendance Summary</h3>
+      <div v-if="attendance" class="stat-grid">
+        <div class="stat-tile">
+          <span class="stat-label">Present</span>
+          <span class="stat-value">{{ attendance.totalPresent }}</span>
+        </div>
+        <div class="stat-tile">
+          <span class="stat-label">Late</span>
+          <span class="stat-value">{{ attendance.totalLate }}</span>
+        </div>
+        <div class="stat-tile">
+          <span class="stat-label">Absent</span>
+          <span class="stat-value">{{ attendance.totalAbsent }}</span>
+        </div>
+        <div class="stat-tile">
+          <span class="stat-label">Attendance</span>
+          <span class="stat-value">{{ attendance.attendancePercentage }}%</span>
+        </div>
+      </div>
+      <p v-else class="muted">No attendance records yet.</p>
+    </section>
+
+    <!-- Grades -->
+    <section class="card section">
+      <h3 class="form-title">Grades</h3>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Assignment</th>
+              <th>Score</th>
+              <th>Percentage</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="gradeRows.length === 0">
+              <td colspan="3" class="muted">No grades recorded yet.</td>
+            </tr>
+            <tr v-for="g in gradeRows" :key="g.assignmentId">
+              <td>{{ g.title }}</td>
+              <td>
+                <span v-if="g.score != null">{{ g.score }} / {{ g.maxScore }}</span>
+                <span v-else class="muted">Not graded</span>
+              </td>
+              <td>
+                <span v-if="g.pct != null">{{ g.pct }}%</span>
+                <span v-else class="muted">—</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
     <!-- Training History -->
     <section class="card section">
