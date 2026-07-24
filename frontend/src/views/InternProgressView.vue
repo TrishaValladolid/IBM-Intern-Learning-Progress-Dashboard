@@ -289,8 +289,13 @@ onMounted(() => {
   <div class="page">
     <div class="page-header">
       <router-link to="/interns" class="back-link">← Interns</router-link>
-      <h1>Intern Progress</h1>
-      <p v-if="progress" class="subtitle">{{ progress.internName }}</p>
+      <div class="profile-title-row">
+        <div>
+          <h1>{{ intern?.name || progress?.internName || 'Intern Profile' }}</h1>
+          <p class="subtitle">Intern progress and development record</p>
+        </div>
+        <router-link v-if="isAdmin" :to="`/interns/${route.params.id}/print`" class="btn btn--secondary">Print</router-link>
+      </div>
     </div>
 
     <p v-if="error" class="error section">{{ error }}</p>
@@ -551,6 +556,12 @@ onMounted(() => {
 }
 .back-link:hover {
   text-decoration: none;
+}
+.profile-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--sp-03);
 }
 .form-title {
   margin-bottom: var(--sp-02);

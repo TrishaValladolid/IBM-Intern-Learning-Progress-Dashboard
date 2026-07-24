@@ -15,7 +15,7 @@ import DashboardLayout from './layouts/DashboardLayout.vue'
 const route = useRoute()
 
 // Show the full shell only when authenticated and off the login screen.
-const showShell = computed(() => auth.isAuthenticated.value && route.path !== '/login')
+const showShell = computed(() => auth.isAuthenticated.value && route.path !== '/login' && !route.meta.print)
 </script>
 
 <template>

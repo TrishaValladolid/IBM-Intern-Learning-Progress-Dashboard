@@ -7,6 +7,7 @@ import InternsView from './views/InternsView.vue'
 import AssignmentsView from './views/AssignmentsView.vue'
 import AssignmentManagerView from './views/AssignmentManagerView.vue'
 import InternProgressView from './views/InternProgressView.vue'
+import InternPrintView from './views/InternPrintView.vue'
 // Placeholder module pages (dashboard foundation — no functionality yet).
 import TrainersView from './views/TrainersView.vue'
 import BatchesView from './views/BatchesView.vue'
@@ -27,6 +28,7 @@ const routes = [
   { path: '/assignments', component: AssignmentsView, meta: { roles: ['ADMIN', 'TRAINER'] } },
   { path: '/assignments/manage', component: AssignmentManagerView, meta: { roles: ['ADMIN'] } },
   { path: '/interns/:id/progress', component: InternProgressView, meta: { roles: ['ADMIN', 'TRAINER'] } },
+  { path: '/interns/:id/print', component: InternPrintView, meta: { roles: ['ADMIN'], print: true } },
   { path: '/reports', component: ReportsView, meta: { roles: ['ADMIN', 'TRAINER'] } },
 
   // Admin-only module pages.
