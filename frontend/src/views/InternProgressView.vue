@@ -70,12 +70,33 @@ const gradeRows = computed(() =>
     return {
       assignmentId: g.assignmentId,
       title: a?.title || `Assignment #${g.assignmentId}`,
+      trainingName: a?.trainingName || 'Other',
       score: g.score,
       maxScore,
       pct,
     }
   }),
 )
+
+// Group the grade rows by their assignment's training and compute a total score
+// per training (sum of scores over sum of maxScores). This gives each training a
+// running "X / Y (Z%)" tally underneath its assignment scores.
+const gradesByTraining = computed(() => {
+  const groups = new Map()
+  for (const r of gradeRows.value) {
+    if (!groups.has(r.trainingName)) {
+      groups.set(r.trainingName, { training: r.trainingName, rows: [], totalScore: 0, totalMax: 0 })
+    }
+    const grp = groups.get(r.trainingName)
+    grp.rows.push(r)
+    if (r.score != null) grp.totalScore += r.score
+    if (r.score != null && r.maxScore) grp.totalMax += r.maxScore
+  }
+  return [...groups.values()].map((grp) => ({
+    ...grp,
+    totalPct: grp.totalMax ? Math.round((grp.totalScore / grp.totalMax) * 100) : null,
+  }))
+})
 
 async function submitScore() {
   scoreError.value = ''
@@ -212,7 +233,7 @@ onMounted(() => {
       <p v-else class="muted">No attendance records yet.</p>
     </section>
 
-    <!-- Grades -->
+    <!-- Grades, grouped by training with a total score per training -->
     <section class="card section">
       <h3 class="form-title">Grades</h3>
       <div class="table-wrap">
@@ -228,17 +249,30 @@ onMounted(() => {
             <tr v-if="gradeRows.length === 0">
               <td colspan="3" class="muted">No grades recorded yet.</td>
             </tr>
-            <tr v-for="g in gradeRows" :key="g.assignmentId">
-              <td>{{ g.title }}</td>
-              <td>
-                <span v-if="g.score != null">{{ g.score }} / {{ g.maxScore }}</span>
-                <span v-else class="muted">Not graded</span>
-              </td>
-              <td>
-                <span v-if="g.pct != null">{{ g.pct }}%</span>
-                <span v-else class="muted">—</span>
-              </td>
-            </tr>
+            <template v-for="grp in gradesByTraining" :key="grp.training">
+              <tr class="training-group-row">
+                <td colspan="3">{{ grp.training }}</td>
+              </tr>
+              <tr v-for="g in grp.rows" :key="g.assignmentId">
+                <td>{{ g.title }}</td>
+                <td>
+                  <span v-if="g.score != null">{{ g.score }} / {{ g.maxScore }}</span>
+                  <span v-else class="muted">Not graded</span>
+                </td>
+                <td>
+                  <span v-if="g.pct != null">{{ g.pct }}%</span>
+                  <span v-else class="muted">—</span>
+                </td>
+              </tr>
+              <tr class="training-total-row">
+                <td>Total</td>
+                <td>{{ grp.totalScore }} / {{ grp.totalMax }}</td>
+                <td>
+                  <span v-if="grp.totalPct != null">{{ grp.totalPct }}%</span>
+                  <span v-else class="muted">—</span>
+                </td>
+              </tr>
+            </template>
           </tbody>
         </table>
       </div>
@@ -394,5 +428,14 @@ onMounted(() => {
   gap: var(--sp-01);
   justify-content: flex-end;
   flex-wrap: wrap;
+}
+/* Grades grouped by training */
+.training-group-row td {
+  font-weight: 600;
+  background: var(--gray-10, #f4f4f4);
+}
+.training-total-row td {
+  font-weight: 600;
+  border-top: 2px solid var(--border, #e0e0e0);
 }
 </style>

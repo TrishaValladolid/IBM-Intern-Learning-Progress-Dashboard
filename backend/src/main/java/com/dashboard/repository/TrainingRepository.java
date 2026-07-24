@@ -22,6 +22,18 @@ public class TrainingRepository {
                 .getResultList();
     }
 
+    // Distinct training names across every intern, for populating the
+    // "assign this assignment to a training" dropdown. Case-insensitive de-dup
+    // keeps one label per training even if casing drifted between batches.
+    public List<String> findDistinctTrainingNames() {
+        return em.createQuery(
+                "SELECT DISTINCT t.trainingName FROM Training t "
+                        + "WHERE t.trainingName IS NOT NULL AND t.trainingName <> '' "
+                        + "ORDER BY t.trainingName",
+                String.class)
+                .getResultList();
+    }
+
     public Training findById(Long id) {
         return em.find(Training.class, id);
     }

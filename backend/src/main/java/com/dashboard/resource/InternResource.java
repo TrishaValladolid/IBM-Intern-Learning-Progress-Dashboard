@@ -262,6 +262,14 @@ public class InternResource {
         return Response.ok(trainingRepository.findByInternId(internId)).build();
     }
 
+    // Distinct training names in use, for the "assign an assignment to a
+    // training" dropdown. Independent assignments simply pick none.
+    @GET
+    @Path("/trainings/names")
+    public List<String> getTrainingNames() {
+        return trainingRepository.findDistinctTrainingNames();
+    }
+
     // Assign one training to every intern in a batch at once (ADMIN).
     // Interns who already have a training with the same name are skipped so
     // re-running the assignment is safe. Returns how many were added vs skipped.

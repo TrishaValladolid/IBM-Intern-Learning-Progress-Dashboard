@@ -40,6 +40,9 @@ public class AssignmentResource {
         existing.setTitle(updated.getTitle());
         existing.setMaxScore(updated.getMaxScore());
         existing.setBatch(updated.getBatch());
+        existing.setTrainingName(updated.getTrainingName());
+        existing.setRepoUrl(updated.getRepoUrl());
+        existing.setDueDate(updated.getDueDate());
         return Response.ok(assignmentRepository.save(existing)).build();
     }
 
